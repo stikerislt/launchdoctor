@@ -2,6 +2,8 @@
 
 Shopify embedded app that scans a merchant's store against 50 beginner failure-mode rules and produces a prioritized fix-it report.
 
+**Marketing site (free, no domain):** enable [GitHub Pages](docs/GITHUB_PAGES.md) → `https://stikerislt.github.io/launchdoctor/`
+
 ## Stack
 
 - Remix + Shopify App Bridge + Polaris

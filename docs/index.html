@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Launch Doctor — Shopify store readiness audits</title>
+    <meta
+      name="description"
+      content="Launch Doctor scans your Shopify store against 50 beginner failure-mode checks and gives you a prioritized fix-it report."
+    />
+    <link rel="icon" href="assets/launch-doctor-icon.png" type="image/png" />
+    <style>
+      :root {
+        --bg: #f4f7f0;
+        --card: #ffffff;
+        --text: #1a1f2e;
+        --muted: #5c6b7a;
+        --green: #008060;
+        --green-dark: #004c3f;
+        --border: #e3e8e0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        color: var(--text);
+        background: linear-gradient(160deg, #f9fbf7 0%, #eef4e8 55%, #f4f7f0 100%);
+        line-height: 1.55;
+      }
+
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 40px;
+      }
+
+      header img {
+        width: 56px;
+        height: 56px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        letter-spacing: -0.02em;
+      }
+
+      header p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .hero {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 32px 28px;
+        box-shadow: 0 12px 40px rgba(26, 31, 46, 0.06);
+      }
+
+      .hero h2 {
+        margin: 0 0 12px;
+        font-size: 1.75rem;
+        line-height: 1.25;
+        letter-spacing: -0.03em;
+      }
+
+      .hero .lead {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+
+      a.btn {
+        display: inline-block;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        text-decoration: none;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      a.btn:hover {
+        transform: translateY(-1px);
+      }
+
+      a.btn-primary {
+        background: var(--green);
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(0, 128, 96, 0.35);
+      }
+
+      a.btn-secondary {
+        background: var(--card);
+        color: var(--green-dark);
+        border: 1px solid var(--border);
+      }
+
+      ul.features {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      ul.features li {
+        padding: 10px 0;
+        border-top: 1px solid var(--border);
+        font-size: 0.98rem;
+      }
+
+      ul.features li strong {
+        color: var(--green-dark);
+      }
+
+      .note {
+        margin-top: 32px;
+        padding: 16px 18px;
+        background: #fff8e6;
+        border: 1px solid #f0d9a8;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        color: #6b5600;
+      }
+
+      .note code {
+        font-size: 0.85em;
+        background: rgba(0, 0, 0, 0.06);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      footer {
+        margin-top: 40px;
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      footer a {
+        color: var(--green);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <img src="assets/launch-doctor-icon.png" alt="" width="56" height="56" />
+        <div>
+          <h1>Launch Doctor</h1>
+          <p>Shopify store readiness audits</p>
+        </div>
+      </header>
+
+      <section class="hero">
+        <h2>Find what will cost you money before it does</h2>
+        <p class="lead">
+          Full-store scan across payments, shipping, catalog, trust, checkout, SEO,
+          and mobile — 50 automated checks with a prioritized Launch Score and fix
+          guidance inside Shopify admin.
+        </p>
+
+        <div class="actions">
+          <a
+            class="btn btn-primary"
+            href="https://github.com/stikerislt/launchdoctor"
+            rel="noopener noreferrer"
+          >
+            View on GitHub
+          </a>
+          <a
+            class="btn btn-secondary"
+            href="https://github.com/stikerislt/launchdoctor/blob/main/README.md"
+            rel="noopener noreferrer"
+          >
+            Setup &amp; deploy guide
+          </a>
+        </div>
+
+        <ul class="features">
+          <li>
+            <strong>50 rules</strong> — payments, fraud risk, shipping zones, thin
+            descriptions, SEO, Lighthouse, and more.
+          </li>
+          <li>
+            <strong>Launch Score</strong> — Core + SEO breakdown with severity-ranked
+            findings.
+          </li>
+          <li>
+            <strong>Fix Center</strong> — Audit Plus subscribers get one-click fixes
+            for catalog and SEO issues.
+          </li>
+          <li>
+            <strong>Runs in admin</strong> — embedded app; no theme code left on your
+            storefront.
+          </li>
+        </ul>
+      </section>
+
+      <div class="note">
+        <strong>This page is free marketing hosting only.</strong> The live Shopify
+        app needs a small cloud host (e.g. Fly.io’s free
+        <code>your-app.fly.dev</code> URL) — you do <em>not</em> need to buy a custom
+        domain. See
+        <a href="https://github.com/stikerislt/launchdoctor/blob/main/docs/PRODUCTION.md"
+          >docs/PRODUCTION.md</a
+        >.
+      </div>
+
+      <footer>
+        <p>
+          <a href="https://github.com/stikerislt/launchdoctor">stikerislt/launchdoctor</a>
+          · Not affiliated with Shopify Inc.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>
