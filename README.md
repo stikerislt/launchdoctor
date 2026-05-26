@@ -2,8 +2,6 @@
 
 Shopify embedded app that scans a merchant's store against 50 beginner failure-mode rules and produces a prioritized fix-it report.
 
-**Marketing site (free, no domain):** enable [GitHub Pages](docs/GITHUB_PAGES.md) → `https://stikerislt.github.io/launchdoctor/`
-
 ## Stack
 
 - Remix + Shopify App Bridge + Polaris
@@ -78,6 +76,10 @@ Production image includes **Playwright/Chromium** for the audit worker. Health c
 | `pnpm test` | Jest unit tests (90% coverage on audit-engine) |
 | `pnpm run lint-rules` | Validate all 50 rules have fixtures |
 | `pnpm typecheck` | TypeScript check |
+
+## Marketing site
+
+Merchant-facing landing page (GitHub Pages, no custom domain): enable `/docs` in [Pages settings](docs/GITHUB_PAGES.md) → `https://stikerislt.github.io/launchdoctor/`
 
 ## Public scanner
 

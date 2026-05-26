@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Launch Doctor — Shopify store readiness audits</title>
+    <title>Launch Doctor — Store readiness audits for Shopify</title>
     <meta
       name="description"
-      content="Launch Doctor scans your Shopify store against 50 beginner failure-mode checks and gives you a prioritized fix-it report."
+      content="Launch Doctor scans your Shopify store for costly beginner mistakes—payments, shipping, SEO, trust, and checkout—and gives you a prioritized fix-it report."
     />
     <link rel="icon" href="assets/launch-doctor-icon.png" type="image/png" />
     <style>
@@ -17,6 +17,7 @@
         --muted: #5c6b7a;
         --green: #008060;
         --green-dark: #004c3f;
+        --green-soft: #e8f5ef;
         --border: #e3e8e0;
       }
 
@@ -34,209 +35,402 @@
           Roboto,
           sans-serif;
         color: var(--text);
-        background: linear-gradient(160deg, #f9fbf7 0%, #eef4e8 55%, #f4f7f0 100%);
+        background: var(--bg);
         line-height: 1.55;
       }
 
       .wrap {
-        max-width: 720px;
+        max-width: 880px;
         margin: 0 auto;
-        padding: 48px 24px 64px;
+        padding: 40px 24px 72px;
       }
 
-      header {
+      .nav {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 16px;
-        margin-bottom: 40px;
+        margin-bottom: 48px;
       }
 
-      header img {
-        width: 56px;
-        height: 56px;
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
       }
 
-      header h1 {
-        margin: 0;
-        font-size: 1.5rem;
+      .brand img {
+        width: 48px;
+        height: 48px;
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 1.15rem;
         letter-spacing: -0.02em;
       }
 
-      header p {
-        margin: 4px 0 0;
+      .brand span {
+        font-size: 0.88rem;
         color: var(--muted);
-        font-size: 0.95rem;
-      }
-
-      .hero {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 32px 28px;
-        box-shadow: 0 12px 40px rgba(26, 31, 46, 0.06);
-      }
-
-      .hero h2 {
-        margin: 0 0 12px;
-        font-size: 1.75rem;
-        line-height: 1.25;
-        letter-spacing: -0.03em;
-      }
-
-      .hero .lead {
-        margin: 0 0 24px;
-        color: var(--muted);
-        font-size: 1.05rem;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-bottom: 28px;
       }
 
       a.btn {
         display: inline-block;
-        padding: 12px 20px;
+        padding: 12px 22px;
         border-radius: 10px;
         font-weight: 600;
         font-size: 0.95rem;
         text-decoration: none;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-      }
-
-      a.btn:hover {
-        transform: translateY(-1px);
+        white-space: nowrap;
       }
 
       a.btn-primary {
         background: var(--green);
         color: #fff;
-        box-shadow: 0 4px 14px rgba(0, 128, 96, 0.35);
+        box-shadow: 0 4px 16px rgba(0, 128, 96, 0.3);
       }
 
-      a.btn-secondary {
-        background: var(--card);
-        color: var(--green-dark);
-        border: 1px solid var(--border);
+      a.btn-primary:hover {
+        background: var(--green-dark);
       }
 
-      ul.features {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-      }
-
-      ul.features li {
-        padding: 10px 0;
-        border-top: 1px solid var(--border);
-        font-size: 0.98rem;
-      }
-
-      ul.features li strong {
-        color: var(--green-dark);
-      }
-
-      .note {
-        margin-top: 32px;
-        padding: 16px 18px;
-        background: #fff8e6;
-        border: 1px solid #f0d9a8;
-        border-radius: 12px;
-        font-size: 0.9rem;
-        color: #6b5600;
-      }
-
-      .note code {
-        font-size: 0.85em;
-        background: rgba(0, 0, 0, 0.06);
-        padding: 2px 6px;
-        border-radius: 4px;
-      }
-
-      footer {
-        margin-top: 40px;
+      .hero {
         text-align: center;
-        font-size: 0.85rem;
+        margin-bottom: 56px;
+      }
+
+      .hero h1 {
+        margin: 0 0 16px;
+        font-size: clamp(2rem, 5vw, 2.75rem);
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+      }
+
+      .hero .lead {
+        margin: 0 auto 28px;
+        max-width: 560px;
+        font-size: 1.15rem;
         color: var(--muted);
       }
 
-      footer a {
+      .hero .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 12px;
+      }
+
+      .hero .cta-note {
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        margin-bottom: 48px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 24px 22px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 1.05rem;
+        color: var(--green-dark);
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+
+      .section-title {
+        text-align: center;
+        margin: 0 0 24px;
+        font-size: 1.35rem;
+        letter-spacing: -0.02em;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 48px;
+      }
+
+      .step {
+        background: var(--green-soft);
+        border-radius: 12px;
+        padding: 20px 18px;
+        text-align: center;
+      }
+
+      .step .num {
+        display: inline-block;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+        border-radius: 50%;
+        background: var(--green);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-bottom: 10px;
+      }
+
+      .step h3 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+      }
+
+      .step p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .pricing {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+        margin-bottom: 48px;
+      }
+
+      .price-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 28px 24px;
+      }
+
+      .price-card.featured {
+        border-color: var(--green);
+        box-shadow: 0 8px 28px rgba(0, 128, 96, 0.12);
+      }
+
+      .price-card .label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
         color: var(--green);
+        margin-bottom: 8px;
+      }
+
+      .price-card h3 {
+        margin: 0 0 4px;
+        font-size: 1.25rem;
+      }
+
+      .price-card .amount {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 12px;
+      }
+
+      .price-card ul {
+        margin: 0;
+        padding: 0 0 0 18px;
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      .price-card li {
+        margin-bottom: 6px;
+      }
+
+      .checks {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 28px 26px;
+        margin-bottom: 48px;
+      }
+
+      .checks p.intro {
+        margin: 0 0 16px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .tag-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      .tag {
+        font-size: 0.82rem;
+        padding: 6px 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--text);
+      }
+
+      footer {
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
       }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <header>
-        <img src="assets/launch-doctor-icon.png" alt="" width="56" height="56" />
-        <div>
-          <h1>Launch Doctor</h1>
-          <p>Shopify store readiness audits</p>
+      <nav class="nav">
+        <div class="brand">
+          <img src="assets/launch-doctor-icon.png" alt="" width="48" height="48" />
+          <div>
+            <strong>Launch Doctor</strong>
+            <span>Shopify store audits</span>
+          </div>
         </div>
-      </header>
+        <a class="btn btn-primary" href="#install">Install on Shopify</a>
+      </nav>
 
       <section class="hero">
-        <h2>Find what will cost you money before it does</h2>
+        <h1>Launch your store with confidence</h1>
         <p class="lead">
-          Full-store scan across payments, shipping, catalog, trust, checkout, SEO,
-          and mobile — 50 automated checks with a prioritized Launch Score and fix
-          guidance inside Shopify admin.
+          One full-store audit finds the beginner mistakes that cause chargebacks, lost
+          sales, and weak SEO—before you spend on ads.
         </p>
-
-        <div class="actions">
-          <a
-            class="btn btn-primary"
-            href="https://github.com/stikerislt/launchdoctor"
-            rel="noopener noreferrer"
-          >
-            View on GitHub
-          </a>
-          <a
-            class="btn btn-secondary"
-            href="https://github.com/stikerislt/launchdoctor/blob/main/README.md"
-            rel="noopener noreferrer"
-          >
-            Setup &amp; deploy guide
-          </a>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#install">Get Launch Doctor</a>
         </div>
-
-        <ul class="features">
-          <li>
-            <strong>50 rules</strong> — payments, fraud risk, shipping zones, thin
-            descriptions, SEO, Lighthouse, and more.
-          </li>
-          <li>
-            <strong>Launch Score</strong> — Core + SEO breakdown with severity-ranked
-            findings.
-          </li>
-          <li>
-            <strong>Fix Center</strong> — Audit Plus subscribers get one-click fixes
-            for catalog and SEO issues.
-          </li>
-          <li>
-            <strong>Runs in admin</strong> — embedded app; no theme code left on your
-            storefront.
-          </li>
-        </ul>
+        <p class="cta-note">Runs inside your Shopify admin · No theme edits required</p>
       </section>
 
-      <div class="note">
-        <strong>This page is free marketing hosting only.</strong> The live Shopify
-        app needs a small cloud host (e.g. Fly.io’s free
-        <code>your-app.fly.dev</code> URL) — you do <em>not</em> need to buy a custom
-        domain. See
-        <a href="https://github.com/stikerislt/launchdoctor/blob/main/docs/PRODUCTION.md"
-          >docs/PRODUCTION.md</a
-        >.
+      <div class="grid">
+        <article class="card">
+          <h3>50 automated checks</h3>
+          <p>
+            Payments, shipping zones, product catalog, trust pages, checkout settings,
+            mobile performance, and SEO—scored in one run.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Launch Score</h3>
+          <p>
+            See Core readiness and SEO visibility at a glance. Every issue is ranked by
+            severity so you know what to fix first.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Actionable fixes</h3>
+          <p>
+            Clear steps in admin for each finding. Audit Plus applies safe catalog and
+            SEO fixes in one click.
+          </p>
+        </article>
       </div>
 
-      <footer>
-        <p>
-          <a href="https://github.com/stikerislt/launchdoctor">stikerislt/launchdoctor</a>
-          · Not affiliated with Shopify Inc.
+      <h2 class="section-title">How it works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Install the app</h3>
+          <p>Add Launch Doctor from the Shopify App Store and open it in admin.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>Run a full audit</h3>
+          <p>We scan your catalog, sitemap, settings, and mobile storefront.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Fix what matters</h3>
+          <p>Follow prioritized guidance—or use Fix Center to apply changes fast.</p>
+        </div>
+      </div>
+
+      <h2 class="section-title">Simple pricing</h2>
+      <div class="pricing">
+        <article class="price-card">
+          <p class="label">Try it</p>
+          <h3>Free preview</h3>
+          <p class="amount">$0</p>
+          <ul>
+            <li>Full issue counts on your dashboard</li>
+            <li>Detailed guidance on top findings</li>
+            <li>See your Launch Score breakdown</li>
+          </ul>
+        </article>
+        <article class="price-card">
+          <p class="label">One report</p>
+          <h3>Full audit unlock</h3>
+          <p class="amount">$19</p>
+          <ul>
+            <li>Every finding with fix steps</li>
+            <li>Downloadable PDF report</li>
+            <li>One-time per audit run</li>
+          </ul>
+        </article>
+        <article class="price-card featured">
+          <p class="label">Best for growth</p>
+          <h3>Audit Plus</h3>
+          <p class="amount">$9<span style="font-size:1rem;font-weight:500">/mo</span></p>
+          <ul>
+            <li>One-click Fix Center</li>
+            <li>Weekly rescans &amp; theme alerts</li>
+            <li>Full report access ongoing</li>
+          </ul>
+        </article>
+      </div>
+
+      <section class="checks">
+        <h2 class="section-title" style="margin-bottom: 12px">What we check</h2>
+        <p class="intro">Examples from 50 rules built for new and growing Shopify stores</p>
+        <div class="tag-grid">
+          <span class="tag">Auto-capture &amp; fraud risk</span>
+          <span class="tag">Shipping zones &amp; rates</span>
+          <span class="tag">Thin product descriptions</span>
+          <span class="tag">Missing image alt text</span>
+          <span class="tag">Homepage SEO</span>
+          <span class="tag">Sitemap &amp; robots</span>
+          <span class="tag">Refund &amp; legal policies</span>
+          <span class="tag">Trust pages</span>
+          <span class="tag">Checkout friction</span>
+          <span class="tag">Mobile Lighthouse</span>
+          <span class="tag">Heavy product images</span>
+          <span class="tag">Inventory &amp; SKUs</span>
+        </div>
+      </section>
+
+      <section class="card" id="install" style="text-align: center; padding: 36px 28px">
+        <h2 style="margin: 0 0 12px; font-size: 1.5rem">Ready to scan your store?</h2>
+        <p style="margin: 0 auto 24px; max-width: 480px; color: var(--muted)">
+          Install Launch Doctor from the Shopify App Store, run your first audit in
+          minutes, and see exactly what to fix before you scale traffic.
         </p>
+        <a
+          class="btn btn-primary"
+          href="https://apps.shopify.com/search?q=launch+doctor"
+          rel="noopener noreferrer"
+          style="font-size: 1.05rem; padding: 14px 28px"
+        >
+          Install on Shopify
+        </a>
+        <p style="margin: 16px 0 0; font-size: 0.88rem; color: var(--muted)">
+          Search “Launch Doctor” in the App Store, or find us under Apps in your Shopify
+          admin.
+        </p>
+      </section>
+
+      <footer>
+        <p>Launch Doctor · Store readiness for Shopify merchants</p>
       </footer>
     </div>
   </body>
