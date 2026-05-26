@@ -1,0 +1,7 @@
+name = "remix"
+roles = ["frontend", "backend"]
+webhooks_path = "/webhooks/app/uninstalled"
+
+[commands]
+predev = "node scripts/predev.mjs"
+dev = "pnpm exec prisma migrate deploy && pnpm exec remix vite:dev"

@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model Store {
+  id            String         @id @default(cuid())
+  shopDomain    String         @unique
+  installedAt   DateTime       @default(now())
+  uninstalledAt DateTime?
+  audits        Audit[]
+  entitlements  Entitlement[]
+  subscriptions Subscription[]
+  fixDismissals  FixDismissal[]
+  ruleDismissals RuleDismissal[]
+
+  @@index([shopDomain])
+}
+
+model Audit {
+  id              String        @id @default(cuid())
+  storeId         String
+  store           Store         @relation(fields: [storeId], references: [id])
+  status          AuditStatus   @default(PENDING)
+  triggeredBy     TriggerSource @default(MANUAL)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationMs      Int?
+  snapshot        Json?
+  findings        Finding[]
+  launchScore     Int?
+  isUnlocked      Boolean       @default(false)
+  unlockedAt      DateTime?
+  oneTimeChargeId String?
+  pdfUrl          String?
+  errorMessage    String?
+
+  @@index([storeId, completedAt])
+}
+
+enum AuditStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum TriggerSource {
+  MANUAL
+  WEBHOOK_THEME_PUBLISH
+  SCHEDULED_WEEKLY
+}
+
+model Finding {
+  id          String   @id @default(cuid())
+  auditId     String
+  audit       Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  ruleId      Int
+  ruleCode    String
+  severity    Severity
+  category    Category
+  title       String
+  body        String
+  fixSteps    Json
+  fixDeepLink String?
+  evidence    Json?
+  confidence  Float    @default(1.0)
+
+  @@index([auditId, severity])
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Category {
+  PAYMENTS_FRAUD
+  SHIPPING_FULFILLMENT
+  PRODUCT_CATALOG
+  SEO_DISCOVERABILITY
+  TRUST_SIGNALS
+  CHECKOUT_CONVERSION
+  MOBILE_THEME
+}
+
+model Entitlement {
+  id        String          @id @default(cuid())
+  storeId   String
+  store     Store           @relation(fields: [storeId], references: [id])
+  type      EntitlementType
+  grantedAt DateTime        @default(now())
+  expiresAt DateTime?
+  chargeId  String?
+
+  @@index([storeId, type])
+}
+
+enum EntitlementType {
+  ONE_TIME_UNLOCK
+  AUDIT_PLUS_MONTHLY
+}
+
+model Subscription {
+  id               String    @id
+  storeId          String
+  store            Store     @relation(fields: [storeId], references: [id])
+  status           String
+  currentPeriodEnd DateTime?
+  startedAt        DateTime  @default(now())
+}
+
+model FixDismissal {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  fixId       String
+  dismissedAt DateTime @default(now())
+
+  @@unique([storeId, fixId])
+  @@index([storeId])
+}
+
+model RuleDismissal {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ruleCode    String
+  dismissedAt DateTime @default(now())
+
+  @@unique([storeId, ruleCode])
+  @@index([storeId])
+}
+
+model WebhookLog {
+  id          String    @id @default(cuid())
+  topic       String
+  shop        String
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  error       String?
+}

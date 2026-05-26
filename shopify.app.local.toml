@@ -1,0 +1,21 @@
+# Local dev without a tunnel — webhooks are omitted because Shopify rejects
+# https://localhost URLs for webhook delivery. Use `shopify app dev` (Cloudflare)
+# or ngrok when you need theme-publish / uninstall webhooks.
+#
+# Run: pnpm dev:local
+
+client_id = "64bc0a8b36533e4a6b743c68f6606dcf"
+name = "Launch Doctor"
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
+handle = "launch-doctor"
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[access_scopes]
+scopes = "read_products,read_inventory,read_orders,read_locations,read_shipping,read_themes,read_content,read_online_store_pages,read_legal_policies,read_payment_terms,read_shopify_payments_payouts,read_customers,read_files,write_products,write_files"
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]

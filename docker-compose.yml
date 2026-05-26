@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: launch_doctor
+      POSTGRES_PASSWORD: launch_doctor
+      POSTGRES_DB: launch_doctor
+    volumes:
+      - launch_doctor_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U launch_doctor -d launch_doctor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - launch_doctor_redis:/data
+
+volumes:
+  launch_doctor_pg:
+  launch_doctor_redis:

@@ -1,0 +1,45 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "64bc0a8b36533e4a6b743c68f6606dcf"
+name = "Launch Doctor"
+# Set to your production host before App Store submit (must match SHOPIFY_APP_URL / APP_URL).
+application_url = "https://launchdoctor.app"
+embedded = true
+handle = "launch-doctor"
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/themes/publish"
+  topics = [ "themes/publish" ]
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products,read_inventory,read_orders,read_locations,read_shipping,read_themes,read_content,read_online_store_pages,read_legal_policies,read_payment_terms,read_shopify_payments_payouts,read_customers,read_files,write_products,write_files,write_content"
+
+[auth]
+redirect_urls = [
+  "https://launchdoctor.app/auth/callback",
+  "https://launchdoctor.app/auth/shopify/callback",
+]
