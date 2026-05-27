@@ -1,6 +1,6 @@
 # Launch Doctor — production image (web + audit worker with Playwright)
 FROM node:20-bookworm-slim AS base
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
 RUN apt-get update -y \
