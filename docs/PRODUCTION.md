@@ -6,8 +6,8 @@
 |-----------|------|
 | **Web** (`pnpm start`) | Remix embedded app — OAuth, UI, webhooks, billing |
 | **Worker** (`pnpm worker:prod`) | BullMQ consumer — full audits (GraphQL + Playwright) |
-| **PostgreSQL** | Prisma — sessions, audits, findings, billing |
-| **Redis** | BullMQ queue |
+| **PostgreSQL** | Prisma — sessions, audits, findings, billing ([Supabase](SUPABASE.md) works) |
+| **Redis** | BullMQ queue (e.g. Upstash — not included in Supabase) |
 | **HTTPS URL** | Must match `SHOPIFY_APP_URL` and `shopify.app.toml` |
 
 Launch Doctor does **not** modify merchant themes or inject storefront scripts.
@@ -27,8 +27,9 @@ fly secrets set \
   SHOPIFY_APP_URL=https://your-domain.com \
   APP_URL=https://your-domain.com \
   DATABASE_URL=... \
+  DIRECT_URL=... \
   REDIS_URL=... \
-  SCOPES="read_products,read_inventory,read_orders,read_locations,read_shipping,read_themes,read_content,read_online_store_pages,read_legal_policies,read_payment_terms,read_shopify_payments_payouts,read_customers,read_files,write_products,write_files,write_content"
+  SCOPES="read_content,read_customers,read_files,read_inventory,read_legal_policies,read_locations,read_online_store_pages,read_orders,read_payment_terms,read_products,read_shipping,read_shopify_payments_payouts,read_themes,write_content,write_files,write_inventory,write_products"
 
 # Optional
 fly secrets set SENTRY_DSN=... S3_BUCKET=... S3_ACCESS_KEY=... S3_SECRET_KEY=... S3_ENDPOINT=... PDF_SIGN_SECRET=...
