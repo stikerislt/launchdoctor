@@ -34,7 +34,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
-    "@prisma/client": "^6.2.1",
+    "@prisma/client": "^7.8.0",
     "@react-pdf/renderer": "^4.2.0",
     "@remix-run/fs-routes": "^2.16.1",
     "@remix-run/node": "^2.16.1",
@@ -51,7 +51,7 @@
     "pino": "^9.6.0",
     "playwright": "^1.50.0",
     "playwright-lighthouse": "^4.0.0",
-    "prisma": "^6.2.1",
+    "prisma": "^7.8.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sharp": "^0.34.5",
