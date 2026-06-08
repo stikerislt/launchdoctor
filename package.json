@@ -46,7 +46,7 @@
     "@shopify/shopify-app-remix": "^4.1.0",
     "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
     "isbot": "^5.1.0",
-    "pino": "^9.6.0",
+    "pino": "^10.3.1",
     "playwright": "^1.50.0",
     "playwright-lighthouse": "^4.0.0",
     "prisma": "^6.2.1",
