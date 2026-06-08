@@ -47,7 +47,7 @@ import { DashboardNavCards } from "../components/DashboardNavCards";
 import { PillarIssueSummary } from "../components/PillarIssueSummary";
 import { shopifyAppPath } from "../lib/app-routes";
 import { APP_ICON_SRC } from "../lib/assets";
-import { isAdmin } from "../lib/admin.server";
+import { isAdmin, isPromotionActive, getSetting } from "../lib/admin.server";
 
 // A RUNNING audit may legitimately take a while on large catalogs, so give it a
 // generous window. A PENDING audit means the worker never even picked the job up,
@@ -185,6 +185,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const scanScope = latestCompleted
     ? getScanScopeFromSnapshot(latestCompleted.snapshot)
     : null;
+  const [promotionActive, promotionEndsAt] = await Promise.all([
+    isPromotionActive(),
+    getSetting("promotion_ends_at"),
+  ]);
+
   const totalFindingCount = latestCompleted?.findings.length ?? 0;
   const activeFindingCount = activeFindings.length;
 
@@ -208,6 +213,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       : 0,
     scanScope,
     isAdminUser: isAdmin(session.email),
+    promotionActive,
+    promotionEndsAt,
   });
 };
 
@@ -261,6 +268,8 @@ export default function Dashboard() {
     totalFindingCount,
     activeFindingCount,
     isAdminUser,
+    promotionActive,
+    promotionEndsAt,
   } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -364,6 +373,20 @@ export default function Dashboard() {
     <Page>
       <TitleBar title="Launch Doctor" />
       <BlockStack gap="500">
+        {promotionActive && (
+          <div className="ld-promo-banner">
+            <span className="ld-promo-banner-icon">🎉</span>
+            <div className="ld-promo-banner-text">
+              <strong>Free promotion active!</strong>
+              <p>
+                {promotionEndsAt
+                  ? `All features are free until ${new Date(promotionEndsAt).toLocaleDateString()}.`
+                  : "All features are currently free for everyone."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {!hasAudits ? (
           <div className="ld-hero-card">
             <div className="ld-hero-content">

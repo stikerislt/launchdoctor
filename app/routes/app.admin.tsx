@@ -9,7 +9,6 @@ import {
   InlineStack,
   Text,
   Badge,
-  TextField,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -166,14 +165,19 @@ export default function AdminPanel() {
               <Form method="post">
                 <input type="hidden" name="intent" value="enable-promotion" />
                 <BlockStack gap="300">
-                  <TextField
-                    label="End date (optional)"
-                    type="date"
-                    name="endsAt"
-                    autoComplete="off"
-                    helpText="Leave blank for indefinite promotion. Set a date to auto-remind yourself to turn it off."
-                    disabled={isSubmitting}
-                  />
+                  <div className="ld-admin-date-field">
+                    <label htmlFor="endsAt">End date (optional)</label>
+                    <input
+                      id="endsAt"
+                      type="date"
+                      name="endsAt"
+                      disabled={isSubmitting}
+                    />
+                    <p className="ld-admin-date-help">
+                      Leave blank for indefinite promotion. Set a date to
+                      auto-remind yourself to turn it off.
+                    </p>
+                  </div>
                   <InlineStack gap="200" blockAlign="center" wrap>
                     <Button submit variant="primary" loading={isSubmitting}>
                       Enable free promotion
