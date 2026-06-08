@@ -96,7 +96,7 @@ export async function runPlaywrightChecks(
       if (Date.now() - start > BUDGET_MS) return nullResult;
 
       return {
-        lighthousePerformance: estimatePerformance(await page.content()),
+        ...nullResult,
         smallestTapTargetPx: pdpMetrics.smallestTap,
         heroImageBytes: heroData.bytes ?? 500_000,
         heroImageLazy: heroData.lazy,
@@ -109,7 +109,6 @@ export async function runPlaywrightChecks(
       ...nullResult,
       heroImageBytes: heroData.bytes ?? 500_000,
       heroImageLazy: heroData.lazy,
-      lighthousePerformance: estimatePerformance(await page.content()),
     };
   } catch {
     return nullResult;
@@ -127,17 +126,6 @@ async function findProductLink(
     return link?.href ?? null;
   });
   return href ?? `${shopUrl}/products`;
-}
-
-function estimatePerformance(html: string): number {
-  const size = html.length;
-  const scriptCount = (html.match(/<script/gi) ?? []).length;
-  let score = 90;
-  if (size > 500_000) score -= 20;
-  else if (size > 200_000) score -= 10;
-  if (scriptCount > 30) score -= 15;
-  else if (scriptCount > 15) score -= 5;
-  return Math.max(20, Math.min(95, score));
 }
 
 export function mobileToSnapshotFields(

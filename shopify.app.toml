@@ -2,17 +2,15 @@
 
 client_id = "64bc0a8b36533e4a6b743c68f6606dcf"
 name = "Launch Doctor"
-# Set to your production host before App Store submit (must match SHOPIFY_APP_URL / APP_URL).
-application_url = "https://launchdoctor.app"
+application_url = "https://launch-doctor.fly.dev"
 embedded = true
 handle = "launch-doctor"
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
-api_version = "2025-10"
+api_version = "2026-07"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/customers/data_request"
@@ -31,15 +29,19 @@ api_version = "2025-10"
   topics = [ "app/uninstalled" ]
 
   [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
+
+  [[webhooks.subscriptions]]
   uri = "/webhooks/themes/publish"
   topics = [ "themes/publish" ]
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,read_inventory,read_orders,read_locations,read_shipping,read_themes,read_content,read_online_store_pages,read_legal_policies,read_payment_terms,read_shopify_payments_payouts,read_customers,read_files,write_products,write_files,write_content"
+# Audit reads + Fix Center writes — see docs/FIX_SCOPES.md and app/lib/shopify-scopes.ts
+scopes = "read_content,read_files,read_inventory,read_legal_policies,read_locations,read_online_store_pages,read_orders,read_products,read_shipping,read_themes,write_content,write_files,write_inventory,write_products"
 
 [auth]
 redirect_urls = [
-  "https://launchdoctor.app/auth/callback",
-  "https://launchdoctor.app/auth/shopify/callback",
+  "https://launch-doctor.fly.dev/auth/callback",
+  "https://launch-doctor.fly.dev/auth/shopify/callback",
 ]

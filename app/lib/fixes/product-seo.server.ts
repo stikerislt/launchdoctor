@@ -24,17 +24,22 @@ export function buildProductSeoDrafts(
       const hasBadProductTitle = isGenericProductTitle(product.title);
       const suggestedProductTitle = suggestProductTitle(product.title, product.handle);
       const namingBase = hasBadProductTitle ? suggestedProductTitle : product.title;
+      const currentSeoTitle = product.seo?.title?.trim() ?? "";
+      const currentSeoDescription = product.seo?.description?.trim() ?? "";
+      const suggestedSeoTitle = suggestProductSeoTitle(namingBase, shopName);
+      const suggestedSeoDescription = suggestProductSeoDescription(namingBase, shopName);
 
       return {
         productId: product.id,
         productTitle: product.title,
         suggestedProductTitle,
         hasBadProductTitle,
-        seoTitle:
-          product.seo?.title?.trim() || suggestProductSeoTitle(namingBase, shopName),
-        seoDescription:
-          product.seo?.description?.trim() ||
-          suggestProductSeoDescription(namingBase, shopName),
+        currentSeoTitle,
+        currentSeoDescription,
+        suggestedSeoTitle,
+        suggestedSeoDescription,
+        seoTitle: suggestedSeoTitle,
+        seoDescription: suggestedSeoDescription,
         missingTitle,
         missingDescription,
       };

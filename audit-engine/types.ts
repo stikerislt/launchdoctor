@@ -109,6 +109,7 @@ export interface StoreSnapshot {
     stats: {
       thinDescPct: number;
       singleImagePct: number;
+      noImagePct: number;
       missingAltPct: number;
       noSkuPct: number;
       compareAtBrokenCount: number;
@@ -156,6 +157,10 @@ export interface StoreSnapshot {
   manualPaymentConfirmationCustomized: boolean;
   mobile: {
     lighthousePerformance: number | null;
+    /** Set when score comes from Google PageSpeed Insights (mobile strategy). */
+    performanceSource?: "pagespeed" | null;
+    /** Public URL passed to PageSpeed / Playwright. */
+    performanceMeasuredUrl?: string | null;
     smallestTapTargetPx: number | null;
     heroImageBytes: number | null;
     heroImageLazy: boolean | null;

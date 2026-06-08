@@ -26,7 +26,7 @@ export function createMinimalSnapshot(
     products: {
       total: 0, sampled: [],
       stats: {
-        thinDescPct: 0, singleImagePct: 0, missingAltPct: 0, noSkuPct: 0,
+        thinDescPct: 0, singleImagePct: 0, noImagePct: 0, missingAltPct: 0, noSkuPct: 0,
         compareAtBrokenCount: 0, duplicatePairCount: 0, noWeightPct: 0,
         inventoryOffPct: 0, heavyImagePct: 0, handleNoisePct: 0, missingProductSeoPct: 0,
       },

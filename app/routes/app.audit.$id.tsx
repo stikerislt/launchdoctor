@@ -2,7 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 
 import { json } from "@remix-run/node";
 
-import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
+import { useFetcher, useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
 
 import { useEffect, useState } from "react";
 
@@ -52,6 +52,8 @@ import { SeveritySummary } from "../components/SeveritySummary";
 import { severityCounts } from "../components/SeverityBadge";
 
 import { shopifyAppPath } from "../lib/app-routes";
+
+import { APP_ICON_SRC } from "../lib/assets";
 
 import { useEmbeddedDownload } from "../hooks/useEmbeddedDownload";
 
@@ -119,6 +121,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     previewCount: PREVIEW_FINDING_COUNT,
 
     showWorkerHint: process.env.NODE_ENV === "development",
+    workerHintMessage:
+      process.env.NODE_ENV === "development"
+        ? "In local dev, run pnpm worker in a second terminal if this page does not update."
+        : "If this screen does not finish within a few minutes, the background worker may not be processing jobs. Try again or contact support.",
     devBillingBypass: isDevBillingBypassEnabled(),
     auditPlusActive,
     fixCount,
@@ -182,6 +188,7 @@ export default function AuditReport() {
   const live = fetcher.data ?? loaderData;
   const {
     showWorkerHint,
+    workerHintMessage,
     previewCount,
     auditPlusActive,
     fixCount,
@@ -210,6 +217,10 @@ export default function AuditReport() {
   const shop = audit.store.shopDomain;
 
   const [selectedTab, setSelectedTab] = useState(0);
+
+  const [searchParams] = useSearchParams();
+  const justUnlocked = searchParams.get("unlocked") === "true";
+  const [showUnlockedBanner, setShowUnlockedBanner] = useState(justUnlocked);
 
   const navigate = useNavigate();
 
@@ -260,7 +271,7 @@ export default function AuditReport() {
 
         <div className="ld-summary-card ld-running-state">
 
-          <img src="/launch-doctor-icon.png" alt="" />
+          <img src={APP_ICON_SRC} alt="" />
 
           <Text as="h2" variant="headingMd">
 
@@ -270,9 +281,9 @@ export default function AuditReport() {
 
           <Text as="p" variant="bodyMd" tone="subdued">
 
-            Running 50 checks across payments, shipping, SEO, and more. Usually takes 1–2
-
-            minutes.
+            Running 50 checks across payments, shipping, SEO, and more. Most scans finish in
+            under a minute; large catalogs can take a couple of minutes. This page updates on
+            its own when your report is ready.
 
           </Text>
 
@@ -282,13 +293,23 @@ export default function AuditReport() {
 
           </div>
 
-          {showWorkerHint && (
+          <Text as="p" variant="bodySm" tone="subdued">
+            You can safely leave or close this page — the scan keeps running in the
+            background. Your report will be waiting on your dashboard when it&rsquo;s done.
+          </Text>
+
+          {showWorkerHint && workerHintMessage && (
 
             <Banner tone="info">
 
-              In local dev, run <code>pnpm worker</code> in a second terminal if this page
-
-              does not update.
+              {workerHintMessage.includes("pnpm worker") ? (
+                <>
+                  In local dev, run <code>pnpm worker</code> in a second terminal if this page
+                  does not update.
+                </>
+              ) : (
+                <>{workerHintMessage}</>
+              )}
 
             </Banner>
 
@@ -381,7 +402,7 @@ export default function AuditReport() {
         <>
           {!isUnlocked && (
             <button variant="primary" onClick={() => navigate(billingPath)}>
-              Unlock full report — $19
+              Unlock options
             </button>
           )}
           {isUnlocked && (
@@ -415,6 +436,17 @@ export default function AuditReport() {
           }
 
         />
+
+        {showUnlockedBanner && (
+          <Banner
+            tone="success"
+            title="Report unlocked"
+            onDismiss={() => setShowUnlockedBanner(false)}
+          >
+            Your full report is now unlocked — every finding, the Fix Center, and
+            PDF export are available below.
+          </Banner>
+        )}
 
         {devBillingBypass && (
           <Banner tone="info">
@@ -599,19 +631,77 @@ export default function AuditReport() {
 
           <div className="ld-unlock-banner">
 
-            <span className="ld-unlock-banner-text">
+            <div className="ld-unlock-banner-main">
 
-              Showing {previewCount} of {audit.findings.length} findings with full fix steps —
-              unlock the full report for every issue and PDF export. SEO counts are always
-              visible on your dashboard; one-click SEO fixes need Audit Plus.
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
 
-            </span>
+                Showing {previewCount} of {audit.findings.length} findings with full fix steps
 
-            <Button onClick={() => navigate(billingPath)} variant="primary">
+              </Text>
 
-              Unlock — $19
+              <Text as="p" variant="bodySm" tone="subdued">
 
-            </Button>
+                Pick the option that fits how you work with Launch Doctor.
+
+              </Text>
+
+              <div className="ld-unlock-options">
+
+                <div className="ld-unlock-option">
+
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+
+                    $19 one-time — this report
+
+                  </Text>
+
+                  <Text as="p" variant="bodySm" tone="subdued">
+
+                    All findings and fix steps for this audit, plus PDF export. Does not
+
+                    include Fix Center or future reports.
+
+                  </Text>
+
+                </div>
+
+                <div className="ld-unlock-option">
+
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+
+                    $9/month — Audit Plus
+
+                  </Text>
+
+                  <Text as="p" variant="bodySm" tone="subdued">
+
+                    Every report unlocked, Fix Center one-click fixes, and theme-publish
+
+                    rescans. Best if you want ongoing monitoring and SEO/catalog automation.
+
+                  </Text>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <InlineStack gap="200" wrap>
+
+              <Button onClick={() => navigate(billingPath)} variant="primary">
+
+                Unlock this report — $19
+
+              </Button>
+
+              <Button onClick={() => navigate(billingPath)}>
+
+                Subscribe — $9/mo
+
+              </Button>
+
+            </InlineStack>
 
           </div>
 

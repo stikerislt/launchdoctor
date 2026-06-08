@@ -10,7 +10,7 @@ export const thmLowLighthouseRule: Rule = {
   category: Category.MOBILE_THEME,
   severity: Severity.HIGH,
   title: "Poor mobile performance score",
-  description: "Playwright Lighthouse mobile performance under 50.",
+  description: "Google PageSpeed Insights mobile performance score under 50.",
   evaluate(snap) {
     const score = snap.mobile.lighthousePerformance;
     if (score === null) return null;
@@ -22,7 +22,7 @@ export const thmLowLighthouseRule: Rule = {
       category: Category.MOBILE_THEME,
       severity: Severity.HIGH,
       title: "Poor mobile performance score",
-      body: `Your mobile Lighthouse performance score is ${score}/100. Slow mobile pages increase bounce rate and hurt Google rankings.`,
+      body: `Your mobile PageSpeed performance score is ${score}/100 (Google Lighthouse, mobile). Slow pages increase bounce rate and hurt Google rankings.`,
       fixSteps: getFixSteps("THM_LOW_LIGHTHOUSE"),
       fixDeepLink: themesLink(snap.shop.handle),
       evidence: { score },

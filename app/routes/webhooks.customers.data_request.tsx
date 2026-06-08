@@ -17,6 +17,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   return new Response(JSON.stringify({ customer_data: [] }), {
+    status: 200,
     headers: { "Content-Type": "application/json" },
   });
 };

@@ -9,4 +9,5 @@ export {
   sessionStorage,
   getOfflineSession,
   getShopHandle,
+  AUDIT_PLUS_PLAN,
 } from "./lib/shopify.server";

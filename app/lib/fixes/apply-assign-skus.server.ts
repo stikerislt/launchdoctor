@@ -52,7 +52,7 @@ export async function applyAssignSkusFix(
         productId,
         variants: productTargets.map((target) => ({
           id: target.variantId,
-          sku: target.suggestedSku,
+          inventoryItem: { sku: target.suggestedSku },
         })),
       });
       appliedCount += productTargets.length;

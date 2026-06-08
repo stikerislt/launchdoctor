@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Session {
@@ -37,6 +38,9 @@ model Store {
   subscriptions Subscription[]
   fixDismissals  FixDismissal[]
   ruleDismissals RuleDismissal[]
+  linkScans      LinkScan[]
+  pageSpeedScans PageSpeedScan[]
+  backgroundJobs BackgroundJob[]
 
   @@index([shopDomain])
 }
@@ -47,6 +51,7 @@ model Audit {
   store           Store         @relation(fields: [storeId], references: [id])
   status          AuditStatus   @default(PENDING)
   triggeredBy     TriggerSource @default(MANUAL)
+  createdAt       DateTime      @default(now())
   startedAt       DateTime?
   completedAt     DateTime?
   durationMs      Int?
@@ -60,6 +65,7 @@ model Audit {
   errorMessage    String?
 
   @@index([storeId, completedAt])
+  @@index([storeId, status])
 }
 
 enum AuditStatus {
@@ -166,4 +172,108 @@ model WebhookLog {
   receivedAt  DateTime  @default(now())
   processedAt DateTime?
   error       String?
+}
+
+// Broken Link Finder (Audit Plus tool). A LinkScan crawls the storefront's
+// content for dead links and broken images; each problem is a LinkIssue.
+// Phase 1 is read-only/report-only — issues guide the merchant to the fix.
+model LinkScan {
+  id           String         @id @default(cuid())
+  storeId      String
+  store        Store          @relation(fields: [storeId], references: [id])
+  status       LinkScanStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  pagesScanned Int            @default(0)
+  linksChecked Int            @default(0)
+  brokenCount  Int            @default(0)
+  truncated    Boolean        @default(false)
+  errorMessage String?
+  issues       LinkIssue[]
+
+  @@index([storeId, status])
+  @@index([storeId, completedAt])
+}
+
+model LinkIssue {
+  id             String   @id @default(cuid())
+  scanId         String
+  scan           LinkScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  // Where the broken link was found: product | page | blog_article | homepage
+  sourceType     String
+  sourceRef      String?
+  sourceLabel    String
+  sourceAdminUrl String?
+  // The broken link/image target, and how it failed.
+  url            String
+  kind           String
+  statusCode     Int?
+  redirectChain  Int      @default(0)
+  detail         String?
+
+  @@index([scanId])
+}
+
+enum LinkScanStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// Mobile PageSpeed Insights (Audit Plus tool). Separate from full audits so
+// merchants can run Google's Lighthouse mobile score on demand.
+// Postgres-backed job queue (replaces BullMQ/Redis). The worker polls only when
+// idle — no always-on Redis command burn from empty queue listeners.
+model BackgroundJob {
+  id           String              @id @default(cuid())
+  storeId      String?
+  store        Store?              @relation(fields: [storeId], references: [id])
+  queue        String
+  payload      Json
+  status       BackgroundJobStatus @default(PENDING)
+  attempts     Int                 @default(0)
+  maxAttempts  Int                 @default(3)
+  runAfter     DateTime            @default(now())
+  createdAt    DateTime            @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  @@index([status, runAfter])
+  @@index([queue, status])
+}
+
+enum BackgroundJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model PageSpeedScan {
+  id           String         @id @default(cuid())
+  storeId      String
+  store        Store          @relation(fields: [storeId], references: [id])
+  status       LinkScanStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  measuredUrl  String?
+  score        Int?
+  errorMessage String?
+
+  @@index([storeId, status])
+  @@index([storeId, completedAt])
+}
+
+// Global admin-configurable settings (key-value store).
+// Used for feature toggles that shouldn't require a code deploy:
+//   promotion_active = "true" | "false"
+//   promotion_ends_at = ISO date string (empty = indefinite)
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

@@ -5,9 +5,9 @@
 | Component | Role |
 |-----------|------|
 | **Web** (`pnpm start`) | Remix embedded app — OAuth, UI, webhooks, billing |
-| **Worker** (`pnpm worker:prod`) | BullMQ consumer — full audits (GraphQL + Playwright) |
-| **PostgreSQL** | Prisma — sessions, audits, findings, billing ([Supabase](SUPABASE.md) works) |
-| **Redis** | BullMQ queue (e.g. Upstash — not included in Supabase) |
+| **Worker** (`pnpm worker:prod`) | Postgres job queue — audits, link scans, PageSpeed (no Redis polling) |
+| **PostgreSQL** | Prisma — sessions, audits, findings, billing, **background jobs** ([Supabase](SUPABASE.md)) |
+| **Redis** | **Not required** (legacy BullMQ removed — avoids Upstash command limits) |
 | **HTTPS URL** | Must match `SHOPIFY_APP_URL` and `shopify.app.toml` |
 
 Launch Doctor does **not** modify merchant themes or inject storefront scripts.
@@ -19,8 +19,6 @@ Recommended: **Fly.io** (see `fly.toml` + `Dockerfile`).
 ```bash
 fly apps create launch-doctor   # once
 fly postgres create           # or attach external DATABASE_URL
-fly redis create              # or Upstash REDIS_URL
-
 fly secrets set \
   SHOPIFY_API_KEY=... \
   SHOPIFY_API_SECRET=... \
@@ -28,11 +26,12 @@ fly secrets set \
   APP_URL=https://your-domain.com \
   DATABASE_URL=... \
   DIRECT_URL=... \
-  REDIS_URL=... \
-  SCOPES="read_content,read_customers,read_files,read_inventory,read_legal_policies,read_locations,read_online_store_pages,read_orders,read_payment_terms,read_products,read_shipping,read_shopify_payments_payouts,read_themes,write_content,write_files,write_inventory,write_products"
+  SCOPES="read_content,read_files,read_inventory,read_legal_policies,read_locations,read_online_store_pages,read_orders,read_products,read_shipping,read_themes,write_content,write_files,write_inventory,write_products"
 
 # Optional
 fly secrets set SENTRY_DSN=... S3_BUCKET=... S3_ACCESS_KEY=... S3_SECRET_KEY=... S3_ENDPOINT=... PDF_SIGN_SECRET=...
+# Mobile performance (Google PageSpeed Insights — required for Store Monitor scores)
+fly secrets set PAGESPEED_API_KEY=...
 
 fly deploy
 fly scale count worker=1
@@ -59,8 +58,9 @@ See `.env.example`. Required in production:
 - `NODE_ENV=production`
 - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`
 - `SHOPIFY_APP_URL`, `APP_URL` (same HTTPS origin)
-- `DATABASE_URL`, `REDIS_URL`
+- `DATABASE_URL` (and `DIRECT_URL` for migrations)
 - `SCOPES` (match `shopify.app.toml`)
+- `PAGESPEED_API_KEY` (Google Cloud — PageSpeed Insights API enabled; used on audit worker for mobile performance)
 
 ## 4. Database migrations
 

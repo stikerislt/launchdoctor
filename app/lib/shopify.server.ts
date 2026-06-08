@@ -2,10 +2,14 @@ import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
+  BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./prisma.server";
+
+/** Audit Plus subscription — used with `billing.request()` / `billing.check()`. */
+export const AUDIT_PLUS_PLAN = "Audit Plus";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -16,6 +20,19 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  // Webhooks are declared in shopify.app.toml and managed by `shopify app deploy`.
+  // Avoid programmatic registerWebhooks here to prevent duplicate/stale subscriptions.
+  billing: {
+    [AUDIT_PLUS_PLAN]: {
+      lineItems: [
+        {
+          amount: 9,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
+  },
   future: {
     unstable_newEmbeddedAuthStrategy: true,
     expiringOfflineAccessTokens: true,

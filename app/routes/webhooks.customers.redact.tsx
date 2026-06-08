@@ -14,5 +14,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     data: { processedAt: new Date() },
   });
 
-  return new Response();
+  return new Response(null, { status: 200 });
 };

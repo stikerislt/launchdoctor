@@ -1,3 +1,9 @@
+export type ShopQueryResult = {
+  shop: {
+    primaryDomain: { host: string; url: string; sslEnabled: boolean };
+  };
+};
+
 export const SHOP_QUERY = `#graphql
   query ShopFundamentals {
     shop {
@@ -5,6 +11,9 @@ export const SHOP_QUERY = `#graphql
       name
       contactEmail
       currencyCode
+      # NOTE: shopAddress (the non-deprecated replacement) only exists in API
+      # 2026-01+. Keep billingAddress until the admin client bumps past 2025-10,
+      # otherwise the Shop query fails with an undefinedField error.
       billingAddress { countryCodeV2 }
       primaryDomain { host url sslEnabled }
       paymentSettings {
@@ -70,9 +79,17 @@ export const PRODUCTS_QUERY = `#graphql
           status
           description
           seo { title description }
-          images(first: 10) {
+          media(first: 10) {
             edges {
-              node { id altText url }
+              node {
+                ... on MediaImage {
+                  id
+                  alt
+                  image {
+                    url
+                  }
+                }
+              }
             }
           }
           variants(first: 50) {
@@ -83,7 +100,6 @@ export const PRODUCTS_QUERY = `#graphql
                 price
                 compareAtPrice
                 inventoryItem { id tracked }
-                inventoryPolicy
               }
             }
           }
@@ -135,16 +151,6 @@ export const ORDERS_STATS_QUERY = `#graphql
           test
           displayFinancialStatus
         }
-      }
-    }
-  }
-`;
-
-export const PAYMENT_CAPTURE_QUERY = `#graphql
-  query PaymentCapture {
-    shop {
-      paymentSettings {
-        autoCapture
       }
     }
   }

@@ -1,13 +1,15 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { Outlet, useLoaderData, useRouteError } from "@remix-run/react";
+import { Link, Outlet, useLoaderData, useNavigation, useRouteError } from "@remix-run/react";
+import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { NavMenu } from "@shopify/app-bridge-react";
+import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import launchDoctorStyles from "../styles/launch-doctor.css?url";
 
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { isAdmin } from "../lib/admin.server";
 export const links = () => [
   { rel: "stylesheet", href: polarisStyles },
   { rel: "stylesheet", href: launchDoctorStyles },
@@ -25,31 +27,59 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     select: { id: true },
   });
 
+  const admin = isAdmin(session.email);
+
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     latestAuditId: latestCompleted?.id ?? null,
+    shopDomain: session.shop,
+    isAdmin: admin,
   };
 };
 
-export default function App() {
-  const { apiKey, latestAuditId } = useLoaderData<typeof loader>();
+/**
+ * Drives the Shopify admin's top loading bar from Remix navigation state so a
+ * nav click gives instant feedback even while the destination loader runs.
+ */
+function NavigationIndicator() {
+  const navigation = useNavigation();
+  const shopify = useAppBridge();
+  const isLoading = navigation.state !== "idle";
 
+  useEffect(() => {
+    shopify.loading(isLoading);
+    return () => shopify.loading(false);
+  }, [shopify, isLoading]);
+
+  return null;
+}
+
+export default function App() {
+  const { apiKey, latestAuditId, isAdmin: showAdminLink } = useLoaderData<typeof loader>();
+
+  // Use Remix <Link> (not raw <a>) inside NavMenu, matching Shopify's official
+  // template. This lets App Bridge perform client-side (soft) navigation via the
+  // `shopify:navigate` event instead of full-document iframe reloads. Paths must
+  // be plain and relative — App Bridge injects shop/host/id_token itself.
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
+      <NavigationIndicator />
       <NavMenu>
-        <a href="/app" rel="home">
+        <Link to="/app" rel="home">
           Dashboard
-        </a>
+        </Link>
         {latestAuditId ? (
-          <a href={`/app/audit/${latestAuditId}`}>Latest report</a>
+          <Link to={`/app/audit/${latestAuditId}`}>Latest report</Link>
         ) : null}
         {latestAuditId ? (
-          <a href={`/app/fixes/${latestAuditId}`}>Fix Center</a>
+          <Link to={`/app/fixes/${latestAuditId}`}>Fix Center</Link>
         ) : null}
-        <a href="/app/audit-plus">Audit Plus</a>
-        <a href="/app/history">History</a>
-        <a href="/app/billing">Billing</a>
-        <a href="/app/settings">Settings</a>
+        <Link to="/app/audit-plus">Audit Plus</Link>
+        <Link to="/app/monitor">Store Monitor</Link>
+        <Link to="/app/history">History</Link>
+        <Link to="/app/billing">Billing</Link>
+        <Link to="/app/settings">Settings</Link>
+        {showAdminLink ? <Link to="/app/admin">Admin</Link> : null}
       </NavMenu>
       <Outlet />
     </AppProvider>

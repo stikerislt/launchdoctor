@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   BlockStack,
+  EmptyState,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -82,11 +83,27 @@ export default function History() {
       <BlockStack gap="400">
         <AppBrandHeader title="Audit History" subtitle="Past scans and scores" />
         <Card>
-          <DataTable
-            columnContentTypes={["text", "numeric", "numeric", "text", "text"]}
-            headings={["Date", "Score", "Critical", "Status", ""]}
-            rows={rows}
-          />
+          {audits.length === 0 ? (
+            <EmptyState
+              heading="No audits yet"
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+              action={{
+                content: "Run your first audit",
+                onAction: () => navigate(shopifyAppPath("/app", shopDomain)),
+              }}
+            >
+              <p>
+                Run your first store audit from the dashboard to see your Launch
+                Score and history here.
+              </p>
+            </EmptyState>
+          ) : (
+            <DataTable
+              columnContentTypes={["text", "numeric", "numeric", "text", "text"]}
+              headings={["Date", "Score", "Critical", "Status", ""]}
+              rows={rows}
+            />
+          )}
         </Card>
       </BlockStack>
     </AppPage>

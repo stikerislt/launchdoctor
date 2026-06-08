@@ -12,17 +12,42 @@ After changing scopes, run `shopify app deploy` and **reinstall / re-approve** t
 |-------|----------|
 | `read_products` | Catalog, variants, media, SEO fields |
 | `read_inventory` | Tracking status, inventory items |
-| `read_orders` | Order stats |
+| `read_orders` | Order stats (see [Protected customer data](#protected-customer-data-level-1)) |
 | `read_locations` | Fulfillment locations |
 | `read_shipping` | Delivery profiles & rates |
 | `read_themes` | Theme / OS 2.0 checks |
 | `read_content` | Pages, blogs (trust page detection) |
 | `read_online_store_pages` | Online store pages |
 | `read_legal_policies` | Refund, privacy, terms, shipping policies |
-| `read_payment_terms` | Payment terms |
-| `read_shopify_payments_payouts` | Payout / payments context |
-| `read_customers` | Customer-related audit signals |
 | `read_files` | File / image metadata |
+
+## Protected customer data (Level 1)
+
+`read_orders` accesses the Shopify `orders` connection, which Shopify classifies as
+**protected customer data**. Non-development stores return `ACCESS_DENIED` (HTTP 200
+with an `errors` entry) until the app is approved for protected customer data in the
+Partner Dashboard. Order queries degrade gracefully (empty data) until then, so audits
+still complete — see `collector/snapshot-builder.ts` (`collectOrders`, `loadCaptureHintOrders`).
+
+**Access level required: Level 1 only.** The order queries
+(`collector/queries/shop.ts` → `ORDERS_STATS_QUERY`, `ORDERS_CAPTURE_HINT_QUERY`) read
+only `totalPriceSet`, `test`, and `displayFinancialStatus`. They do **not** read any
+protected customer *fields* (name, address, email, phone), so **Level 2 is not required**
+and those fields must **not** be selected in the access request.
+
+| What we read | Why |
+|--------------|-----|
+| 30-day order count + average order value | Recommend a free-shipping threshold (`rules/11-no-free-threshold.ts`) |
+| `displayFinancialStatus` (`AUTHORIZED` / `PAID`) | Detect manual payment-capture risk (`rules/01-auto-capture.ts`) |
+| `test` flag | Exclude test orders from the above |
+
+**Request access:** Partner Dashboard → app → **API access requests** → **Protected
+customer data access** → **Request access** → select **Protected customer data** (Level 1
+only) → provide the justification above → complete **Data protection details** → submit.
+Dev stores work as soon as the data is selected; live stores work after approval.
+
+> App listing / review questionnaire: because of `read_orders`, the app **does** use
+> protected customer data at **Level 1** (orders, no PII fields). Answer "yes" accordingly.
 
 ## Write scopes (Fix Center)
 

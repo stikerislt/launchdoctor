@@ -224,6 +224,21 @@ export const FINDING_GUIDANCE: Record<string, FindingGuidanceEntry> = {
       "Aim for at least 150 characters per product",
     ],
   },
+  PROD_NO_IMAGE: {
+    whyItMatters:
+      "A product with no image rarely sells. Many themes hide image-less products, and they are excluded from Google Shopping, the Shop app, and most marketing channels.",
+    adminPath: `${ADMIN.products} → [product] → Media`,
+    actionLabel: "Open products",
+    tips: [
+      "Sort the Products list and look for the placeholder image to find every product missing media.",
+      "Add at least one clear hero shot per product before you launch ads or sync feeds.",
+    ],
+    fixSteps: [
+      `Go to ${ADMIN.products} and open each product with no image`,
+      "Upload at least one image in the Media section (drag and drop or paste a URL)",
+      "Add descriptive alt text while you are there to boost image SEO",
+    ],
+  },
   PROD_SINGLE_IMAGE: {
     whyItMatters:
       "Multiple angles and lifestyle shots reduce returns. Shoppers cannot touch the product — photos must do the selling.",
@@ -640,6 +655,22 @@ export const FINDING_GUIDANCE: Record<string, FindingGuidanceEntry> = {
       `Go to ${ADMIN.themes}`,
       "Check for theme updates in the theme library",
       "Preview the update before publishing",
+    ],
+  },
+  PROD_PNG_FORMAT: {
+    whyItMatters:
+      "PNG files are often 3-5x larger than WebP at the same quality. Converting to WebP reduces page weight, improves Core Web Vitals, and helps SEO rankings.",
+    adminPath: ADMIN.products,
+    actionLabel: "Open Image Optimizer",
+    tips: [
+      "WebP is supported by all modern browsers and Shopify's CDN.",
+      "Launch Doctor can convert all PNG images to WebP in one click from the Image Optimizer.",
+    ],
+    fixSteps: [
+      `Open the Image Optimizer tool from the Launch Doctor dashboard`,
+      "Review the format breakdown showing PNG vs WebP counts",
+      "Click 'Convert remaining PNGs to WebP' to process all PNG images",
+      "Re-scan your store to refresh your Launch Score",
     ],
   },
 };

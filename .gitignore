@@ -25,3 +25,7 @@ yarn.lock
 # Ignore shopify files created during app dev
 .shopify/*
 .shopify.lock
+
+# Temporary DB migration credentials / dumps (never commit)
+migrate.env
+migrate.dump.sql

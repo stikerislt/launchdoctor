@@ -22,6 +22,7 @@
   width: 44px;
   height: 44px;
   border-radius: 10px;
+  object-fit: contain;
   box-shadow: 0 2px 8px rgba(26, 31, 46, 0.12);
 }
 
@@ -80,6 +81,13 @@
   border-radius: 12px;
   padding: 16px;
   background: #fafbfb;
+}
+
+.ld-product-seo-preview {
+  border: 1px dashed #c9cccf;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
 }
 
 @media (max-width: 768px) {
@@ -219,6 +227,7 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
@@ -420,14 +429,41 @@
 
 .ld-unlock-banner {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
   background: linear-gradient(90deg, #fff8e6 0%, #fff 100%);
   border: 1px solid #f4d484;
   border-radius: 12px;
-  padding: 14px 18px;
+  padding: 16px 18px;
+}
+
+.ld-unlock-banner-main {
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ld-unlock-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .ld-unlock-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ld-unlock-option {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #f0e0b8;
+  border-radius: 8px;
+  padding: 10px 12px;
 }
 
 .ld-unlock-banner-text {
@@ -646,6 +682,7 @@
   width: 56px;
   height: 56px;
   border-radius: 12px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
@@ -697,6 +734,8 @@
   width: 64px;
   height: 64px;
   margin-bottom: 16px;
+  border-radius: 12px;
+  object-fit: contain;
   animation: ld-pulse 2s ease-in-out infinite;
 }
 
@@ -760,4 +799,41 @@
 
 .ld-dashboard-plus-card--active {
   border-left: 4px solid var(--ld-accent);
+}
+
+/* ── Image Optimizer ── */
+
+.ld-image-optimizer-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ld-border);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.ld-image-optimizer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ld-border);
+  background: #fff;
+}
+
+.ld-image-optimizer-row:last-child {
+  border-bottom: none;
+}
+
+.ld-image-optimizer-row--error {
+  background: #fef3f2;
+}
+
+.ld-image-optimizer-savings {
+  background: linear-gradient(135deg, #f1f8f5 0%, #f9fbf7 100%);
+  border: 1px solid #c9e8df;
+  border-radius: 12px;
+  padding: 20px 24px;
 }

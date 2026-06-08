@@ -21,17 +21,19 @@ export function getMissingAltTargets(products: SnapshotProduct[]) {
     productId: string;
     productTitle: string;
     imageId: string;
+    imageUrl: string;
     suggestedAlt: string;
   }> = [];
 
   for (const product of products) {
     const images = product.images ?? [];
     images.forEach((image, index) => {
-      if (image.altText?.trim()) return;
+      if (image.altText?.trim() || !image.url) return;
       targets.push({
         productId: product.id,
         productTitle: product.title,
         imageId: image.id,
+        imageUrl: image.url,
         suggestedAlt: index === 0 ? product.title : `${product.title} — image ${index + 1}`,
       });
     });
@@ -54,6 +56,10 @@ export function getHeavyImageTargets(products: SnapshotProduct[]) {
       };
     })
     .filter((target) => target.imageUrl && target.imageId);
+}
+
+export function getNoImageTargets(products: SnapshotProduct[]) {
+  return products.filter((product) => (product.images?.length ?? 0) === 0);
 }
 
 export function getThinDescriptionTargets(products: SnapshotProduct[]) {
@@ -195,4 +201,95 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/* ── Image format detection ── */
+
+export type ImageFormat = "png" | "jpeg" | "webp" | "svg" | "gif" | "other";
+
+/** Detect image format from a Shopify CDN URL (falls back to path extension parsing). */
+export function detectImageFormat(url: string): ImageFormat {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+
+    if (pathname.endsWith(".webp")) return "webp";
+    if (pathname.endsWith(".png")) return "png";
+    if (pathname.endsWith(".jpg") || pathname.endsWith(".jpeg")) return "jpeg";
+    if (pathname.endsWith(".svg")) return "svg";
+    if (pathname.endsWith(".gif")) return "gif";
+
+    // Shopify CDN often appends ?v=... — check before query params
+    const base = pathname.split("?")[0];
+    if (!base) return "other";
+    if (base.endsWith(".webp")) return "webp";
+    if (base.endsWith(".png")) return "png";
+    if (base.endsWith(".jpg") || base.endsWith(".jpeg")) return "jpeg";
+    if (base.endsWith(".svg")) return "svg";
+    if (base.endsWith(".gif")) return "gif";
+  } catch {
+    // Not a valid URL
+  }
+  return "other";
+}
+
+export type FormatBreakdown = {
+  png: number;
+  jpeg: number;
+  webp: number;
+  svg: number;
+  gif: number;
+  other: number;
+  total: number;
+};
+
+/** Compute format breakdown across all product images in the snapshot. */
+export function getImageFormatBreakdown(products: SnapshotProduct[]): FormatBreakdown {
+  const breakdown: FormatBreakdown = {
+    png: 0,
+    jpeg: 0,
+    webp: 0,
+    svg: 0,
+    gif: 0,
+    other: 0,
+    total: 0,
+  };
+
+  for (const product of products) {
+    for (const image of product.images ?? []) {
+      if (!image.url) continue;
+      const fmt = detectImageFormat(image.url);
+      breakdown[fmt]++;
+      breakdown.total++;
+    }
+  }
+
+  return breakdown;
+}
+
+export type PngImageTarget = {
+  productId: string;
+  productTitle: string;
+  imageId: string;
+  imageUrl: string;
+  bytes: number | null;
+};
+
+/** Find all PNG product images (regardless of size) that could be converted to WebP. */
+export function getPngImageTargets(products: SnapshotProduct[]): PngImageTarget[] {
+  const targets: PngImageTarget[] = [];
+
+  for (const product of products) {
+    for (const image of product.images ?? []) {
+      if (!image.url || detectImageFormat(image.url) !== "png") continue;
+      targets.push({
+        productId: product.id,
+        productTitle: product.title,
+        imageId: image.id,
+        imageUrl: image.url,
+        bytes: image.bytes,
+      });
+    }
+  }
+
+  return targets;
 }

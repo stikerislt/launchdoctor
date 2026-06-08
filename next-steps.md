@@ -13,7 +13,7 @@
 - Bulk audit scheduling and white-label PDF reports
 
 ## API limitations noted in v1
-- `PAY_AUTO_CAPTURE`: uses `paymentSettings.autoCapture` when the API exposes it; otherwise infers from recent order financial status
+- `PAY_AUTO_CAPTURE`: infers capture mode from recent order financial status (API 2025-10 has no `paymentSettings.autoCapture`)
 - `PAY_NO_3DS_EU`: 3DS configuration not fully exposed via Admin API — collector uses defaults
 - `CHK_VISIBLE_DISCOUNT_FIELD`: confidence 0.6 — checkout UI settings partially inferred
 - `THM_*` mobile rules: skipped with confidence 0 when Playwright times out

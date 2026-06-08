@@ -27,6 +27,22 @@ export function humanizeProductHandle(handle: string): string {
     .join(" ");
 }
 
+function titleFromHandleSegments(handle: string): string {
+  return handle
+    .replace(/-\d{5,}$/, "")
+    .split("-")
+    .filter(Boolean)
+    .filter(
+      (part) =>
+        !/^(product|item|new|test|sample|draft|untitled|default|placeholder)$/i.test(
+          part,
+        ),
+    )
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+    .trim();
+}
+
 export function suggestProductTitle(
   currentTitle: string,
   handle: string,
@@ -40,5 +56,14 @@ export function suggestProductTitle(
     return fromHandle;
   }
 
-  return currentTitle.trim();
+  const fromSegments = titleFromHandleSegments(handle);
+  if (fromSegments.length >= 3 && !isGenericProductTitle(fromSegments)) {
+    return fromSegments;
+  }
+
+  if (fromHandle.length >= 1) {
+    return `Store — ${fromHandle}`;
+  }
+
+  return `Store — ${handle.replace(/-/g, " ").slice(0, 48)}`;
 }

@@ -49,6 +49,8 @@ import { thmHeavyHeroRule } from "./47-heavy-hero";
 import { thmSmallFontRule } from "./48-small-font";
 import { thmNoStickyAtcRule } from "./49-no-sticky-atc";
 import { thmOutdatedRule } from "./50-outdated";
+import { prodNoImageRule } from "./51-no-image";
+import { prodPngFormatRule } from "./52-png-format";
 
 export const allRules: Rule[] = [
   payAutoCaptureRule,
@@ -101,6 +103,8 @@ export const allRules: Rule[] = [
   thmSmallFontRule,
   thmNoStickyAtcRule,
   thmOutdatedRule,
+  prodNoImageRule,
+  prodPngFormatRule,
 ];
 
 export const ruleByCode = new Map(allRules.map((r) => [r.code, r]));

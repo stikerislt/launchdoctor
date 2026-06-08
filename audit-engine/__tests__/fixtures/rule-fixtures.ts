@@ -58,7 +58,7 @@ export const prodPriceOutlierTrigger = createBaseSnapshot({
       seo: { title: null, description: null },
     }],
     stats: {
-      thinDescPct: 0, singleImagePct: 0, missingAltPct: 0, noSkuPct: 0,
+      thinDescPct: 0, singleImagePct: 0, noImagePct: 0, missingAltPct: 0, noSkuPct: 0,
       compareAtBrokenCount: 0, duplicatePairCount: 0, noWeightPct: 0,
       inventoryOffPct: 0, heavyImagePct: 0, handleNoisePct: 0, missingProductSeoPct: 0,
     },
@@ -217,6 +217,10 @@ buildRuleFixtures("PROD_THIN_DESC", {
 
 buildRuleFixtures("PROD_SINGLE_IMAGE", {
   products: { stats: { singleImagePct: 30 } },
+});
+
+buildRuleFixtures("PROD_NO_IMAGE", {
+  products: { stats: { noImagePct: 30 } },
 });
 
 buildRuleFixtures("PROD_MISSING_ALT", {

@@ -30,9 +30,16 @@ import { isDevBillingBypassEnabled } from "../lib/billing.server";
 import { applyFix, FIX_IDS } from "../lib/fixes/registry.server";
 import type { FixId, FixPreview, ProductSeoDraft } from "../lib/fixes/types";
 import { FIX_RULE_CODES, PRODUCT_SEO_EDIT_LIMIT } from "../lib/fixes/types";
-import { isGenericProductTitle } from "../lib/fixes/product-naming";
 import { FIX_APPLY_LABELS } from "../lib/fixes/labels";
+import {
+  describeProductSeoChanges,
+  productSeoInitialEditState,
+  productSeoSaveBlockedReason,
+  productSeoSavable,
+  productSeoSuggestionsApplied,
+} from "../lib/fixes/product-seo-ui";
 import { resolveProductSeoUpdatesFromForm } from "../lib/fixes/product-seo.server";
+import { sessionHasScope } from "../lib/fix-access-errors.server";
 import { enqueueAudit } from "../lib/queue.server";
 import prisma from "../db.server";
 import { AppPage } from "../components/AppPage";
@@ -51,9 +58,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw redirect(shopifyAppPath(`/app/audit/${audit.id}`, session.shop));
   }
 
-  const auditPlusActive = await hasAuditPlus(audit.storeId);
-  const dismissedFixIds = await getDismissedFixIds(audit.storeId);
-  const dismissedRuleCodes = await getDismissedRuleCodes(audit.storeId);
+  const [auditPlusActive, dismissedFixIds, dismissedRuleCodes] = await Promise.all([
+    hasAuditPlus(audit.storeId),
+    getDismissedFixIds(audit.storeId),
+    getDismissedRuleCodes(audit.storeId),
+  ]);
   const scores = resolveScoresFromFindings(
     audit.findings,
     audit.launchScore,
@@ -62,6 +71,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const allFixes = auditPlusActive ? buildFixPreviews(audit.snapshot) : [];
   const fixes = allFixes.filter((fix) => !dismissedFixIds.has(fix.id));
   const dismissedFixes = allFixes.filter((fix) => dismissedFixIds.has(fix.id));
+
+  const hasWriteInventoryScope = sessionHasScope(session.scope, "write_inventory");
 
   return json({
     shopDomain: session.shop,
@@ -73,6 +84,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     completedAt: audit.completedAt,
     devBillingBypass: isDevBillingBypassEnabled(),
     rawFindingCount: audit.findings.length,
+    hasWriteInventoryScope,
   });
 };
 
@@ -124,9 +136,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return redirect(shopifyAppPath(`/app/fixes/${audit.id}`, session.shop));
   }
 
+  // Explicit, merchant-triggered re-scan. Applying individual fixes no longer
+  // enqueues an audit (see below) — the merchant batches fixes and re-scans once.
+  if (intent === "rescan") {
+    const newAudit = await prisma.audit.create({
+      data: {
+        storeId: audit.storeId,
+        status: "PENDING",
+        triggeredBy: "MANUAL",
+      },
+    });
+    await enqueueAudit(newAudit.id, audit.storeId);
+    return redirect(
+      shopifyAppPath(`/app/audit/${newAudit.id}?rescan=1`, session.shop),
+    );
+  }
+
   const title = String(formData.get("title") ?? "");
   const description = String(formData.get("description") ?? "");
-  const rerun = formData.get("rerun") === "true";
 
   if (!FIX_IDS.includes(fixId)) {
     return json({ fixId, error: "Unknown fix type.", success: false }, { status: 400 });
@@ -147,30 +174,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       productSeoUpdates,
     });
 
-    if (rerun && result.appliedCount > 0) {
-      const newAudit = await prisma.audit.create({
-        data: {
-          storeId: audit.storeId,
-          status: "PENDING",
-          triggeredBy: "MANUAL",
-        },
-      });
-      await enqueueAudit(newAudit.id);
-      return redirect(
-        shopifyAppPath(
-          `/app/audit/${newAudit.id}?fixApplied=${encodeURIComponent(fixId)}`,
-          session.shop,
-        ),
-      );
-    }
-
+    // Applying a fix no longer auto-triggers a full re-audit. Re-collecting the
+    // whole store on every small change is expensive (Shopify GraphQL + browser
+    // checks + all rules) and pulls the merchant out of Fix Center to wait. They
+    // re-scan once, via the "Re-scan store" action, after batching their fixes.
     return json({
       fixId,
       success: result.success,
       message: result.message,
       errors: result.errors,
       appliedCount: result.appliedCount,
-      rerunQueued: rerun && result.appliedCount > 0,
+      storeChanged: result.appliedCount > 0,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Fix failed.";
@@ -189,6 +203,7 @@ export default function FixCenter() {
     completedAt,
     devBillingBypass,
     rawFindingCount,
+    hasWriteInventoryScope,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
@@ -200,6 +215,9 @@ export default function FixCenter() {
       ? (navigation.formData?.get("fixId") as FixId | undefined)
       : undefined;
   const isSubmitting = navigation.state === "submitting";
+  const isRescanning =
+    navigation.state !== "idle" &&
+    navigation.formData?.get("intent") === "rescan";
 
   type FixFeedback = {
     tone: "success" | "warning" | "critical";
@@ -234,44 +252,47 @@ export default function FixCenter() {
         productSeoFix.productSeoDrafts.map((draft) => [
           draft.productId,
           {
-            productTitle: draft.hasBadProductTitle
-              ? draft.suggestedProductTitle
-              : draft.productTitle,
-            seoTitle: draft.seoTitle,
-            seoDescription: draft.seoDescription,
+            productTitle: draft.productTitle,
+            seoTitle: draft.currentSeoTitle,
+            seoDescription: draft.currentSeoDescription,
           },
         ]),
       ),
     );
   }, [productSeoFix]);
 
+  function getProductSeoEdit(draft: ProductSeoDraft) {
+    return (
+      productSeoEdits[draft.productId] ?? productSeoInitialEditState(draft)
+    );
+  }
+
   const productSeoPayload =
-    productSeoFix?.productSeoDrafts?.map((draft) => {
-      const edit = productSeoEdits[draft.productId];
-      return {
-        productId: draft.productId,
-        productTitle:
-          draft.hasBadProductTitle
-            ? edit?.productTitle ?? draft.suggestedProductTitle
-            : edit?.productTitle?.trim() || undefined,
-        seoTitle: edit?.seoTitle ?? draft.seoTitle,
-        seoDescription: edit?.seoDescription ?? draft.seoDescription,
-      };
-    }) ?? [];
+    productSeoFix?.productSeoDrafts
+      ?.filter((draft) => productSeoSavable(draft, getProductSeoEdit(draft)))
+      .map((draft) => {
+        const edit = getProductSeoEdit(draft);
+        return {
+          productId: draft.productId,
+          productTitle:
+            draft.hasBadProductTitle
+              ? edit.productTitle.trim()
+              : edit.productTitle.trim() !== draft.productTitle.trim()
+                ? edit.productTitle.trim()
+                : undefined,
+          seoTitle: edit.seoTitle.trim(),
+          seoDescription: edit.seoDescription.trim(),
+        };
+      }) ?? [];
 
-  const productSeoReady =
-    productSeoFix?.productSeoDrafts?.every((draft) => {
-      const edit = productSeoEdits[draft.productId];
-      const seoTitle = edit?.seoTitle.trim();
-      const seoDescription = edit?.seoDescription.trim();
-      const productTitle = edit?.productTitle.trim();
+  const productSeoSavableCount = productSeoPayload.length;
 
-      if (!seoTitle || !seoDescription) return false;
-      if (draft.hasBadProductTitle) {
-        return Boolean(productTitle && !isGenericProductTitle(productTitle));
-      }
-      return true;
-    }) ?? true;
+  const productSeoCanSave = productSeoSavableCount > 0;
+
+  const productSeoBlockedReasons =
+    productSeoFix?.productSeoDrafts
+      ?.map((draft) => productSeoSaveBlockedReason(draft, getProductSeoEdit(draft)))
+      .filter((reason): reason is string => Boolean(reason)) ?? [];
 
   function updateProductSeoField(
     productId: string,
@@ -293,9 +314,11 @@ export default function FixCenter() {
     setProductSeoEdits((prev) => ({
       ...prev,
       [draft.productId]: {
-        productTitle: draft.suggestedProductTitle,
-        seoTitle: draft.seoTitle,
-        seoDescription: draft.seoDescription,
+        productTitle: draft.hasBadProductTitle
+          ? draft.suggestedProductTitle
+          : draft.productTitle,
+        seoTitle: draft.suggestedSeoTitle,
+        seoDescription: draft.suggestedSeoDescription,
       },
     }));
   }
@@ -311,7 +334,7 @@ export default function FixCenter() {
         [fixId]: {
           tone: "critical",
           title: "Fix failed",
-          message: actionData.error,
+          message: String(actionData.error),
         },
       }));
       return;
@@ -335,8 +358,8 @@ export default function FixCenter() {
             : "Nothing to update",
         message:
           actionData.message +
-          ("rerunQueued" in actionData && actionData.rerunQueued
-            ? " A fresh audit has been queued."
+          ("storeChanged" in actionData && actionData.storeChanged
+            ? " Re-scan your store to refresh your Launch Score."
             : ""),
         errors: hasErrors ? actionData.errors : undefined,
       },
@@ -394,10 +417,36 @@ export default function FixCenter() {
         )}
 
         {auditPlusActive && (
-          <Banner tone="info">
-            These fixes apply changes directly to your store. After applying, you&apos;re
-            sent to a fresh audit so Fix Center reflects what Shopify reports now — not
-            the old scan snapshot.
+          <Banner tone={appliedFixes.size > 0 ? "success" : "info"}>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd">
+                {appliedFixes.size > 0
+                  ? "Your changes are live in Shopify. Apply any other fixes you need, then re-scan once to refresh your Launch Score and confirm the issues are resolved."
+                  : "These fixes apply changes directly to your store. Apply the ones you need, then re-scan to refresh your Launch Score — Fix Center will reflect what Shopify reports now."}
+              </Text>
+              <Form method="post">
+                <input type="hidden" name="intent" value="rescan" />
+                <Button
+                  submit
+                  variant={appliedFixes.size > 0 ? "primary" : "secondary"}
+                  loading={isRescanning}
+                  disabled={isSubmitting && !isRescanning}
+                >
+                  Re-scan store
+                </Button>
+              </Form>
+            </BlockStack>
+          </Banner>
+        )}
+
+        {auditPlusActive && !hasWriteInventoryScope && fixes.some((f) => f.id === "enable-inventory") && (
+          <Banner tone="warning" title="Inventory permission update required">
+            <Text as="p" variant="bodyMd">
+              Enable inventory tracking needs the <code>write_inventory</code> scope.
+              Re-open Launch Doctor from Shopify Admin → Apps and approve updated
+              permissions when prompted. Your staff account must also be allowed to
+              manage inventory.
+            </Text>
           </Banner>
         )}
 
@@ -415,7 +464,7 @@ export default function FixCenter() {
                 <Form method="post">
                   <input type="hidden" name="intent" value="dismiss-all" />
                   <Button submit variant="primary" loading={isSubmitting}>
-                    Dismiss all ({rawFindingCount} checks)
+                    {`Dismiss all (${rawFindingCount} checks)`}
                   </Button>
                 </Form>
                 {(dismissedFixes.length > 0 || fixes.length === 0) && (
@@ -435,25 +484,6 @@ export default function FixCenter() {
             </BlockStack>
           </Card>
         )}
-
-        {actionData &&
-          "fixId" in actionData &&
-          actionData.fixId &&
-          fixFeedback[actionData.fixId] && (
-            <Banner
-              tone={fixFeedback[actionData.fixId].tone}
-              title={fixFeedback[actionData.fixId].title}
-              onDismiss={() =>
-                setFixFeedback((prev) => {
-                  const next = { ...prev };
-                  delete next[actionData.fixId as string];
-                  return next;
-                })
-              }
-            >
-              {fixFeedback[actionData.fixId].message}
-            </Banner>
-          )}
 
         {auditPlusActive && fixes.length === 0 && dismissedFixes.length === 0 && (
           <Card>
@@ -505,7 +535,7 @@ export default function FixCenter() {
                 {isApplying && <Badge tone="info">Applying…</Badge>}
               </InlineStack>
 
-              {fix.id !== "product-seo" && fix.items.length > 0 && (
+              {!fix.guided && fix.id !== "product-seo" && fix.items.length > 0 && (
                 <List type="bullet">
                   {fix.items.map((item) => (
                     <List.Item key={item.id}>
@@ -521,23 +551,101 @@ export default function FixCenter() {
                 </List>
               )}
 
+              {fix.guided && auditPlusActive && (
+                <BlockStack gap="300">
+                  <BlockStack gap="200">
+                    {fix.items.map((item) => (
+                      <InlineStack
+                        key={item.id}
+                        align="space-between"
+                        blockAlign="center"
+                        wrap
+                        gap="200"
+                      >
+                        <Text as="span" variant="bodyMd">
+                          {item.label}
+                          {item.detail ? ` — ${item.detail}` : ""}
+                        </Text>
+                        {item.adminUrl && (
+                          <Button url={item.adminUrl} target="_blank" size="slim">
+                            Add image →
+                          </Button>
+                        )}
+                      </InlineStack>
+                    ))}
+                    {fix.itemCount > fix.items.length && (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        + {fix.itemCount - fix.items.length} more product
+                        {fix.itemCount - fix.items.length === 1 ? "" : "s"} without an
+                        image. Open Products to see the full list.
+                      </Text>
+                    )}
+                  </BlockStack>
+
+                  {feedback && (
+                    <Banner
+                      tone={feedback.tone}
+                      title={feedback.title}
+                      onDismiss={() =>
+                        setFixFeedback((prev) => {
+                          const next = { ...prev };
+                          delete next[fix.id];
+                          return next;
+                        })
+                      }
+                    >
+                      <Text as="p" variant="bodyMd">
+                        {feedback.message}
+                      </Text>
+                    </Banner>
+                  )}
+
+                  <InlineStack gap="200" blockAlign="center" wrap>
+                    {fix.guidedActionUrl && (
+                      <Button
+                        url={fix.guidedActionUrl}
+                        target="_blank"
+                        variant="primary"
+                      >
+                        {fix.guidedActionLabel ?? "Open in Shopify"} →
+                      </Button>
+                    )}
+                    <Button onClick={() => setDismissTarget(fix)} disabled={isSubmitting}>
+                      Dismiss
+                    </Button>
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      Opens Shopify admin in a new tab. Re-scan after adding images to
+                      update your Launch Score.
+                    </Text>
+                  </InlineStack>
+                </BlockStack>
+              )}
+
+              {fix.id === "enable-inventory" && auditPlusActive && !hasWriteInventoryScope && (
+                <Banner tone="warning">
+                  Re-open this app from Shopify Admin → Apps to grant inventory write access,
+                  then try again. Staff accounts need permission to manage inventory.
+                </Banner>
+              )}
+
               {fix.id === "product-seo" && auditPlusActive && fix.productSeoDrafts && (
                 <BlockStack gap="300">
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Edit product names, SEO titles, and meta descriptions before saving.
-                    Generic names like “Product 2” get a suggested rename from the product handle.
+                    Only products you edit are saved — you don&apos;t need to fill every row.
+                    Use <strong>Fill with suggested values</strong> on the products you want,
+                    then save (up to {PRODUCT_SEO_EDIT_LIMIT} per batch).
                     {fix.itemCount > fix.productSeoDrafts.length
-                      ? ` ${fix.itemCount - fix.productSeoDrafts.length} more product${fix.itemCount - fix.productSeoDrafts.length === 1 ? "" : "s"} will remain for a follow-up save.`
+                      ? ` ${fix.itemCount - fix.productSeoDrafts.length} more product${fix.itemCount - fix.productSeoDrafts.length === 1 ? "" : "s"} can be fixed in a follow-up visit.`
                       : ""}
                   </Text>
 
                   <div className="ld-product-seo-list">
                     {fix.productSeoDrafts.map((draft) => {
-                      const edit = productSeoEdits[draft.productId] ?? {
-                        productTitle: draft.suggestedProductTitle,
-                        seoTitle: draft.seoTitle,
-                        seoDescription: draft.seoDescription,
-                      };
+                      const edit = getProductSeoEdit(draft);
+                      const suggestionsFilled = productSeoSuggestionsApplied(draft, edit);
+                      const willSave = productSeoSavable(draft, edit);
+                      const savePreview = describeProductSeoChanges(draft, edit);
+                      const blockedReason = productSeoSaveBlockedReason(draft, edit);
 
                       return (
                         <div key={draft.productId} className="ld-product-seo-item">
@@ -550,15 +658,55 @@ export default function FixCenter() {
                                 {draft.hasBadProductTitle && (
                                   <Badge tone="warning">Generic name</Badge>
                                 )}
+                                {draft.missingTitle && (
+                                  <Badge tone="attention">Missing SEO title</Badge>
+                                )}
+                                {draft.missingDescription && (
+                                  <Badge tone="attention">Missing description</Badge>
+                                )}
+                                {willSave && <Badge tone="success">Will save</Badge>}
                               </InlineStack>
                               <Button
                                 size="slim"
                                 onClick={() => applyProductSeoSuggestion(draft)}
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || suggestionsFilled}
                               >
-                                Use suggestions
+                                {suggestionsFilled
+                                  ? "Suggestions applied"
+                                  : "Fill with suggested values"}
                               </Button>
                             </InlineStack>
+
+                            <div className="ld-product-seo-preview">
+                              <Text as="p" variant="bodySm" fontWeight="semibold">
+                                Suggested values (what Fill will set)
+                              </Text>
+                              <List type="bullet">
+                                {draft.hasBadProductTitle && (
+                                  <List.Item>
+                                    Product name: {draft.suggestedProductTitle}
+                                    {draft.productTitle !== draft.suggestedProductTitle
+                                      ? ` (currently “${draft.productTitle}”)`
+                                      : ""}
+                                  </List.Item>
+                                )}
+                                <List.Item>
+                                  SEO title: {draft.suggestedSeoTitle}
+                                  {draft.currentSeoTitle
+                                    ? ` (currently “${draft.currentSeoTitle}”)`
+                                    : " (currently empty)"}
+                                </List.Item>
+                                <List.Item>
+                                  Meta description:{" "}
+                                  {draft.suggestedSeoDescription.length > 80
+                                    ? `${draft.suggestedSeoDescription.slice(0, 80)}…`
+                                    : draft.suggestedSeoDescription}
+                                  {draft.currentSeoDescription
+                                    ? " (has existing text)"
+                                    : " (currently empty)"}
+                                </List.Item>
+                              </List>
+                            </div>
 
                             {draft.hasBadProductTitle && (
                               <TextField
@@ -595,6 +743,20 @@ export default function FixCenter() {
                               helpText={`${edit.seoDescription.length}/320 characters recommended`}
                               disabled={isSubmitting}
                             />
+
+                            {willSave ? (
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Will save: {savePreview.join(" · ")}
+                              </Text>
+                            ) : blockedReason ? (
+                              <Text as="p" variant="bodySm" tone="critical">
+                                {blockedReason}
+                              </Text>
+                            ) : (
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Skipped until you fill or edit this product.
+                              </Text>
+                            )}
                           </BlockStack>
                         </div>
                       );
@@ -669,7 +831,7 @@ export default function FixCenter() {
                 </BlockStack>
               )}
 
-              {feedback && (
+              {!fix.guided && feedback && (
                 <Banner
                   tone={feedback.tone}
                   title={feedback.title}
@@ -696,7 +858,7 @@ export default function FixCenter() {
                 </Banner>
               )}
 
-              {auditPlusActive && (
+              {auditPlusActive && !fix.guided && (
                 <Form method="post">
                   <input type="hidden" name="intent" value="apply" />
                   <input type="hidden" name="fixId" value={fix.id} />
@@ -713,19 +875,56 @@ export default function FixCenter() {
                       value={JSON.stringify(productSeoPayload)}
                     />
                   )}
-                  <input type="hidden" name="rerun" value="true" />
+                  {fix.id === "product-seo" && !productSeoCanSave && productSeoBlockedReasons.length > 0 && (
+                    <Banner tone="warning">
+                      <BlockStack gap="200">
+                        <Text as="p" variant="bodyMd">
+                          Fix the products you started editing, or leave them unchanged to skip
+                          them. You can save as soon as at least one product is ready.
+                        </Text>
+                        <List type="bullet">
+                          {productSeoBlockedReasons.map((reason) => (
+                            <List.Item key={reason}>{reason}</List.Item>
+                          ))}
+                        </List>
+                      </BlockStack>
+                    </Banner>
+                  )}
+                  {fix.id === "product-seo" && !productSeoCanSave && productSeoBlockedReasons.length === 0 && (
+                    <Banner tone="info">
+                      <Text as="p" variant="bodyMd">
+                        Edit or use Fill on at least one product to enable Save. Other products
+                        in the list can stay as-is.
+                      </Text>
+                    </Banner>
+                  )}
+                  {fix.id === "product-seo" && productSeoCanSave && productSeoBlockedReasons.length > 0 && (
+                    <Banner tone="info">
+                      <Text as="p" variant="bodyMd">
+                        Saving {productSeoSavableCount} product
+                        {productSeoSavableCount === 1 ? "" : "s"}. Products you started but
+                        didn&apos;t finish will be skipped.
+                      </Text>
+                    </Banner>
+                  )}
                   <InlineStack gap="200" blockAlign="center" wrap>
                     <Button
                       submit
                       variant="primary"
                       loading={isApplying}
-                      disabled={(isSubmitting && !isApplying) || (fix.id === "product-seo" && !productSeoReady)}
+                      disabled={
+                        (isSubmitting && !isApplying) ||
+                        (fix.id === "product-seo" && !productSeoCanSave) ||
+                        (fix.id === "enable-inventory" && !hasWriteInventoryScope)
+                      }
                     >
                       {isApplying
                         ? "Applying to your store…"
                         : wasApplied
                           ? "Apply again"
-                          : FIX_APPLY_LABELS[fix.id](fix.itemCount)}
+                          : fix.id === "product-seo" && productSeoSavableCount > 0
+                            ? `Save ${productSeoSavableCount} product${productSeoSavableCount === 1 ? "" : "s"}`
+                            : FIX_APPLY_LABELS[fix.id](fix.itemCount)}
                     </Button>
                     <Button
                       onClick={() => setDismissTarget(fix)}

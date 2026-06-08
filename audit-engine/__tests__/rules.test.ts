@@ -59,7 +59,7 @@ const MESSY_STORE_OVERRIDES = {
   },
   products: {
     stats: {
-      thinDescPct: 30, singleImagePct: 30, missingAltPct: 0, noSkuPct: 0,
+      thinDescPct: 30, singleImagePct: 30, noImagePct: 0, missingAltPct: 0, noSkuPct: 0,
       compareAtBrokenCount: 0, duplicatePairCount: 0, noWeightPct: 0,
       inventoryOffPct: 0, heavyImagePct: 0, handleNoisePct: 0, missingProductSeoPct: 0,
     },
@@ -198,19 +198,19 @@ describe("audit engine", () => {
 
     it("has stable id and metadata", () => {
       expect(rule.id).toBeGreaterThanOrEqual(1);
-      expect(rule.id).toBeLessThanOrEqual(50);
+      expect(rule.id).toBeLessThanOrEqual(51);
       expect(rule.title).toBeTruthy();
       expect(rule.description).toBeTruthy();
     });
   });
 
   describe("rule uniqueness", () => {
-    it("has 50 rules with unique ids and codes", () => {
-      expect(allRules).toHaveLength(50);
+    it("has 51 rules with unique ids and codes", () => {
+      expect(allRules).toHaveLength(51);
       const ids = new Set(allRules.map((r) => r.id));
       const codes = new Set(allRules.map((r) => r.code));
-      expect(ids.size).toBe(50);
-      expect(codes.size).toBe(50);
+      expect(ids.size).toBe(51);
+      expect(codes.size).toBe(51);
     });
   });
 });

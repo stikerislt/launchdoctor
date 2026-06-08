@@ -11,6 +11,7 @@ import { applyEnableInventoryFix } from "./apply-enable-inventory.server";
 import { applyHomepageSeoFix } from "./apply-homepage-seo.server";
 
 import { applyOptimizeImagesFix } from "./apply-optimize-images.server";
+import { applyConvertPngToWebpFix } from "./apply-optimize-images.server";
 
 import { applyProductSeoFix } from "./apply-product-seo.server";
 
@@ -26,6 +27,8 @@ export const FIX_IDS: FixId[] = [
 
   "optimize-images",
 
+  "convert-png-to-webp",
+
   "homepage-seo",
 
   "product-seo",
@@ -37,6 +40,8 @@ export const FIX_IDS: FixId[] = [
   "enable-inventory",
 
   "trust-pages",
+
+  "add-product-images",
 
 ];
 
@@ -68,6 +73,10 @@ export async function applyFix(
 
       return applyOptimizeImagesFix(admin, snapshotJson);
 
+    case "convert-png-to-webp":
+
+      return applyConvertPngToWebpFix(admin, snapshotJson);
+
     case "homepage-seo":
 
       return applyHomepageSeoFix(admin, snapshotJson, {
@@ -97,6 +106,18 @@ export async function applyFix(
     case "trust-pages":
 
       return applyTrustPagesFix(admin, snapshotJson);
+
+    case "add-product-images":
+
+      // Guided-only: photos can't be generated. Surfaced as deep links in the UI;
+      // there's nothing to auto-apply.
+      return {
+        success: false,
+        message:
+          "Adding product photos is a guided fix — use the links to upload images in Shopify.",
+        appliedCount: 0,
+        errors: [],
+      };
 
     default:
 

@@ -33,6 +33,7 @@ export function formatEvidence(
       break;
     case "PROD_THIN_DESC":
     case "PROD_SINGLE_IMAGE":
+    case "PROD_NO_IMAGE":
     case "PROD_MISSING_ALT":
     case "PROD_NO_SKU":
     case "PROD_NO_WEIGHT":
@@ -46,6 +47,7 @@ export function formatEvidence(
         const labels: Record<string, string> = {
           thinDescPct: "of sampled products have descriptions under 50 characters",
           singleImagePct: "of sampled products have fewer than 3 images",
+          noImagePct: "of sampled products have no image at all",
           missingAltPct: "of sampled products are missing image alt text",
           noSkuPct: "of variants have no SKU",
           noWeightPct: "of variants have no weight set",
@@ -132,7 +134,7 @@ export function formatEvidence(
       break;
     case "THM_LOW_LIGHTHOUSE":
       if (typeof evidence.score === "number") {
-        lines.push(`Mobile Lighthouse performance score: ${Math.round(evidence.score)}/100`);
+        lines.push(`Mobile PageSpeed performance score: ${Math.round(evidence.score)}/100`);
       }
       break;
     case "THM_TINY_TAPS":

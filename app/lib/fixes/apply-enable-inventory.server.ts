@@ -1,5 +1,6 @@
 import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import type { FixResult } from "./types";
+import { formatInventoryFixError } from "../fix-access-errors.server";
 import { adminGraphql } from "./graphql.server";
 import {
   getInventoryOffTargets,
@@ -47,10 +48,9 @@ export async function applyEnableInventoryFix(
       });
       appliedCount += 1;
     } catch (error) {
+      const raw = error instanceof Error ? error.message : "Unknown error";
       errors.push(
-        `${target.productTitle} (${target.variantLabel}): ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        `${target.productTitle} (${target.variantLabel}): ${formatInventoryFixError(raw)}`,
       );
     }
   }

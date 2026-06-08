@@ -4,6 +4,7 @@ import {
   legalLink,
   normalizeAdminPath,
   policiesLink,
+  productAdminLink,
   resolveAdminDeepLink,
   RULE_DEEP_LINKS,
 } from "../utils/deep-link";
@@ -14,6 +15,21 @@ describe("deep-link", () => {
   it("builds store-scoped admin URLs", () => {
     expect(legalLink(handle)).toBe(
       "https://admin.shopify.com/store/northward-systems/settings/legal",
+    );
+  });
+
+  it("productAdminLink resolves a GID to a numeric product URL", () => {
+    expect(productAdminLink(handle, "gid://shopify/Product/12345")).toBe(
+      "https://admin.shopify.com/store/northward-systems/products/12345",
+    );
+    expect(productAdminLink(handle, "67890")).toBe(
+      "https://admin.shopify.com/store/northward-systems/products/67890",
+    );
+  });
+
+  it("productAdminLink falls back to the products list without a numeric id", () => {
+    expect(productAdminLink(handle, "no-digits")).toBe(
+      "https://admin.shopify.com/store/northward-systems/products",
     );
   });
 
@@ -50,7 +66,7 @@ describe("deep-link", () => {
   });
 
   it("covers all 50 rule codes", () => {
-    expect(Object.keys(RULE_DEEP_LINKS).length).toBe(48);
+    expect(Object.keys(RULE_DEEP_LINKS).length).toBe(49);
     expect(getRuleDeepLink("SEO_PRODUCT_META", handle)).toBe(
       "https://admin.shopify.com/store/northward-systems/products",
     );

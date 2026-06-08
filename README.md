@@ -14,9 +14,12 @@ Shopify embedded app that scans a merchant's store against 50 beginner failure-m
 ```bash
 pnpm install
 cp .env.example .env
-# Fill in SHOPIFY_API_KEY, SHOPIFY_API_SECRET, DATABASE_URL, REDIS_URL
+# Fill in SHOPIFY_API_KEY, SHOPIFY_API_SECRET, DATABASE_URL, DIRECT_URL, REDIS_URL
+# SCOPES must match shopify.app.toml — see docs/FIX_SCOPES.md
+# Using Supabase Postgres? See docs/SUPABASE.md
 
-pnpm prisma migrate dev
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy
 pnpm dev
 ```
 

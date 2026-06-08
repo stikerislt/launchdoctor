@@ -2,8 +2,10 @@ import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import sharp from "sharp";
 import type { FixResult } from "./types";
 import { adminGraphql } from "./graphql.server";
+import { resolveProductMediaId } from "./product-media.server";
 import {
   getHeavyImageTargets,
+  getPngImageTargets,
   getSnapshotProducts,
   parseAuditSnapshot,
 } from "./snapshot.server";
@@ -129,6 +131,7 @@ async function uploadOptimizedImage(
   return target.resourceUrl;
 }
 
+/** Replaces a product's hero image with an optimized WebP version. Returns the optimized byte count. */
 async function replaceHeavyHeroImage(
   admin: AdminApiContext,
   target: {
@@ -137,7 +140,7 @@ async function replaceHeavyHeroImage(
     imageId: string;
     imageUrl: string;
   },
-): Promise<void> {
+): Promise<number> {
   const optimized = await optimizeImage(target.imageUrl);
   const resourceUrl = await uploadOptimizedImage(admin, optimized);
 
@@ -157,69 +160,235 @@ async function replaceHeavyHeroImage(
     throw new Error("Optimized image upload did not return media.");
   }
 
-  try {
-    await adminGraphql(admin, PRODUCT_DELETE_MEDIA, {
-      productId: target.productId,
-      mediaIds: [target.imageId],
-    });
-  } catch {
-    await adminGraphql(admin, PRODUCT_REORDER_MEDIA, {
-      id: target.productId,
-      moves: [{ id: newMediaId, newPosition: "0" }],
-    });
+  const heroMediaId = await resolveProductMediaId(
+    admin,
+    target.productId,
+    target.imageUrl,
+    target.imageId,
+  );
+  if (!heroMediaId) {
+    throw new Error(
+      "Could not match hero image to product media. Re-run the audit and try again.",
+    );
+  }
 
+  await adminGraphql(admin, PRODUCT_REORDER_MEDIA, {
+    id: target.productId,
+    moves: [{ id: newMediaId, newPosition: "0" }],
+  });
+
+  if (heroMediaId !== newMediaId) {
     await adminGraphql(admin, PRODUCT_DELETE_MEDIA, {
       productId: target.productId,
-      mediaIds: [target.imageId],
+      mediaIds: [heroMediaId],
     });
   }
+
+  return optimized.buffer.length;
 }
 
+/** Simple fix-center compatible wrapper. */
 export async function applyOptimizeImagesFix(
   admin: AdminApiContext,
   snapshotJson: unknown,
   limit = 25,
 ): Promise<FixResult> {
+  const result = await optimizeImagesWithStats(admin, snapshotJson, limit);
+  return {
+    success: result.failCount === 0,
+    message:
+      result.failCount === 0
+        ? `Optimized ${result.successCount} product image${result.successCount === 1 ? "" : "s"}.`
+        : `Optimized ${result.successCount} product image${result.successCount === 1 ? "" : "s"} with ${result.failCount} error${result.failCount === 1 ? "" : "s"}.`,
+    appliedCount: result.successCount,
+    errors: result.results.filter((r) => r.error).map((r) => `${r.productTitle}: ${r.error}`),
+  };
+}
+
+export type PerImageResult = {
+  productId: string;
+  productTitle: string;
+  originalBytes: number;
+  optimizedBytes: number;
+  originalKB: number;
+  optimizedKB: number;
+  savedKB: number;
+  success: boolean;
+  error?: string;
+};
+
+export type BatchOptimizeResult = {
+  results: PerImageResult[];
+  totalOriginalBytes: number;
+  totalOptimizedBytes: number;
+  totalOriginalKB: number;
+  totalOptimizedKB: number;
+  totalSavedKB: number;
+  successCount: number;
+  failCount: number;
+};
+
+/** Runs image optimization on all heavy images from a snapshot and returns per-image before/after stats for the status bar. */
+export async function optimizeImagesWithStats(
+  admin: AdminApiContext,
+  snapshotJson: unknown,
+  limit = 25,
+): Promise<BatchOptimizeResult> {
   const snapshot = parseAuditSnapshot(snapshotJson);
   const targets = getHeavyImageTargets(getSnapshotProducts(snapshot)).slice(0, limit);
 
-  if (targets.length === 0) {
-    return {
-      success: true,
-      message: "No oversized product images found.",
-      appliedCount: 0,
-      errors: [],
-    };
-  }
-
-  let appliedCount = 0;
-  const errors: string[] = [];
+  const results: PerImageResult[] = [];
+  let successCount = 0;
+  let failCount = 0;
 
   for (const target of targets) {
     if (!target.imageUrl || !target.imageId) continue;
 
+    const originalBytes = target.bytes ?? 0;
+
     try {
-      await replaceHeavyHeroImage(admin, {
+      const optimizedBytes = await replaceHeavyHeroImage(admin, {
         productId: target.productId,
         productTitle: target.productTitle,
         imageId: target.imageId,
         imageUrl: target.imageUrl,
       });
-      appliedCount += 1;
+
+      successCount += 1;
+      results.push({
+        productId: target.productId,
+        productTitle: target.productTitle,
+        originalBytes,
+        optimizedBytes,
+        originalKB: Math.round(originalBytes / 1024),
+        optimizedKB: Math.round(optimizedBytes / 1024),
+        savedKB: Math.round((originalBytes - optimizedBytes) / 1024),
+        success: true,
+      });
     } catch (error) {
-      errors.push(
-        `${target.productTitle}: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
+      failCount += 1;
+      results.push({
+        productId: target.productId,
+        productTitle: target.productTitle,
+        originalBytes,
+        optimizedBytes: originalBytes,
+        originalKB: Math.round(originalBytes / 1024),
+        optimizedKB: Math.round(originalBytes / 1024),
+        savedKB: 0,
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   }
 
+  const totalOriginalBytes = results.reduce((sum, r) => sum + r.originalBytes, 0);
+  const totalOptimizedBytes = results.reduce((sum, r) => sum + r.optimizedBytes, 0);
+
   return {
-    success: errors.length === 0,
+    results,
+    totalOriginalBytes,
+    totalOptimizedBytes,
+    totalOriginalKB: Math.round(totalOriginalBytes / 1024),
+    totalOptimizedKB: Math.round(totalOptimizedBytes / 1024),
+    totalSavedKB: Math.round((totalOriginalBytes - totalOptimizedBytes) / 1024),
+    successCount,
+    failCount,
+  };
+}
+
+/** Simple fix-center compatible wrapper for PNG→WebP conversion. */
+export async function applyConvertPngToWebpFix(
+  admin: AdminApiContext,
+  snapshotJson: unknown,
+  limit = 25,
+): Promise<FixResult> {
+  const result = await convertPngImagesWithStats(admin, snapshotJson, limit);
+  return {
+    success: result.failCount === 0,
     message:
-      errors.length === 0
-        ? `Optimized ${appliedCount} product image${appliedCount === 1 ? "" : "s"}.`
-        : `Optimized ${appliedCount} product image${appliedCount === 1 ? "" : "s"} with ${errors.length} error${errors.length === 1 ? "" : "s"}.`,
-    appliedCount,
-    errors,
+      result.failCount === 0
+        ? `Converted ${result.successCount} PNG image${result.successCount === 1 ? "" : "s"} to WebP.`
+        : `Converted ${result.successCount} PNG image${result.successCount === 1 ? "" : "s"} with ${result.failCount} error${result.failCount === 1 ? "" : "s"}.`,
+    appliedCount: result.successCount,
+    errors: result.results
+      .filter((r) => r.error)
+      .map((r) => `${r.productTitle}: ${r.error}`),
+  };
+}
+
+export type PngConvertResult = {
+  results: PerImageResult[];
+  totalOriginalBytes: number;
+  totalOptimizedBytes: number;
+  totalOriginalKB: number;
+  totalOptimizedKB: number;
+  totalSavedKB: number;
+  successCount: number;
+  failCount: number;
+};
+
+/** Converts all PNG product images to WebP (regardless of file size). Returns per-image before/after stats. */
+export async function convertPngImagesWithStats(
+  admin: AdminApiContext,
+  snapshotJson: unknown,
+  limit = 25,
+): Promise<PngConvertResult> {
+  const snapshot = parseAuditSnapshot(snapshotJson);
+  const targets = getPngImageTargets(getSnapshotProducts(snapshot)).slice(0, limit);
+
+  const results: PerImageResult[] = [];
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const target of targets) {
+    const originalBytes = target.bytes ?? 0;
+
+    try {
+      const optimizedBytes = await replaceHeavyHeroImage(admin, {
+        productId: target.productId,
+        productTitle: target.productTitle,
+        imageId: target.imageId,
+        imageUrl: target.imageUrl,
+      });
+
+      successCount += 1;
+      results.push({
+        productId: target.productId,
+        productTitle: target.productTitle,
+        originalBytes,
+        optimizedBytes,
+        originalKB: Math.round(originalBytes / 1024),
+        optimizedKB: Math.round(optimizedBytes / 1024),
+        savedKB: Math.round((originalBytes - optimizedBytes) / 1024),
+        success: true,
+      });
+    } catch (error) {
+      failCount += 1;
+      results.push({
+        productId: target.productId,
+        productTitle: target.productTitle,
+        originalBytes,
+        optimizedBytes: originalBytes,
+        originalKB: Math.round(originalBytes / 1024),
+        optimizedKB: Math.round(originalBytes / 1024),
+        savedKB: 0,
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  const totalOriginalBytes = results.reduce((sum, r) => sum + r.originalBytes, 0);
+  const totalOptimizedBytes = results.reduce((sum, r) => sum + r.optimizedBytes, 0);
+
+  return {
+    results,
+    totalOriginalBytes,
+    totalOptimizedBytes,
+    totalOriginalKB: Math.round(totalOriginalBytes / 1024),
+    totalOptimizedKB: Math.round(totalOptimizedBytes / 1024),
+    totalSavedKB: Math.round((totalOriginalBytes - totalOptimizedBytes) / 1024),
+    successCount,
+    failCount,
   };
 }

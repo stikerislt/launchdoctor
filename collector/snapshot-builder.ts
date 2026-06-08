@@ -3,7 +3,8 @@ import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import type { StoreSnapshot, PolicyType } from "../audit-engine/types";
 import { graphqlWithRetry } from "./graphql";
 import { fetchPublicData, headCheck } from "./public-fetch";
-import { runPlaywrightChecks } from "./playwright-runner";
+import { collectMobileInsights } from "./mobile-insights";
+import { resolveStorefrontUrl } from "./storefront-url";
 import { resolveHomepageSeo as resolveHomepageSeoFields } from "../audit-engine/utils/homepage-seo";
 import { normalizedLevenshtein } from "../audit-engine/utils/levenshtein";
 import {
@@ -14,7 +15,6 @@ import {
   LOCATIONS_QUERY,
   ORDERS_STATS_QUERY,
   ORDERS_CAPTURE_HINT_QUERY,
-  PAYMENT_CAPTURE_QUERY,
 } from "./queries/shop";
 
 interface ShopQueryResult {
@@ -29,6 +29,18 @@ interface ShopQueryResult {
     titleTag: { value: string } | null;
     descriptionTag: { value: string } | null;
     description: string | null;
+  };
+}
+
+/**
+ * Logs an optional collector failure and returns null so the audit can continue
+ * with degraded data instead of silently swallowing the error.
+ */
+function logOptionalFailure<T>(label: string): (err: unknown) => T | null {
+  return (err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[collector] optional data "${label}" unavailable: ${message}`);
+    return null;
   };
 }
 
@@ -51,25 +63,32 @@ export async function buildSnapshot(
     locationsData,
     ordersData,
     publicData,
-    mobileData,
   ] = await Promise.all([
     graphqlWithRetry<ShopQueryResult>(admin, SHOP_QUERY),
-    graphqlWithRetry<DeliveryQueryResult>(admin, DELIVERY_QUERY).catch(() => null),
+    graphqlWithRetry<DeliveryQueryResult>(admin, DELIVERY_QUERY).catch(
+      logOptionalFailure<DeliveryQueryResult>("delivery profiles"),
+    ),
     collectProducts(admin),
-    graphqlWithRetry<ThemeQueryResult>(admin, THEMES_QUERY).catch(() => null),
-    graphqlWithRetry<LocationQueryResult>(admin, LOCATIONS_QUERY).catch(() => null),
+    graphqlWithRetry<ThemeQueryResult>(admin, THEMES_QUERY).catch(
+      logOptionalFailure<ThemeQueryResult>("themes"),
+    ),
+    graphqlWithRetry<LocationQueryResult>(admin, LOCATIONS_QUERY).catch(
+      logOptionalFailure<LocationQueryResult>("locations"),
+    ),
     collectOrders(admin, isoDate!),
     fetchPublicData(shopDomain),
-    runPlaywrightChecks(shopUrl),
   ]);
+
+  const storefrontUrl = resolveStorefrontUrl(
+    shopData.shop.primaryDomain,
+    shopDomain,
+  );
+  const mobileData = await collectMobileInsights(storefrontUrl);
 
   const policies = normalizePolicies(shopData.shop.shopPolicies);
   const products = productsData;
-  const [autoCapture, captureHintOrders] = await Promise.all([
-    loadAutoCaptureSetting(admin),
-    loadCaptureHintOrders(admin),
-  ]);
-  const paymentCapture = resolvePaymentCapture(autoCapture, captureHintOrders);
+  const captureHintOrders = await loadCaptureHintOrders(admin);
+  const paymentCapture = resolvePaymentCapture(null, captureHintOrders);
   const homeCountry = shopData.shop.billingAddress?.countryCodeV2 ?? "US";
   const delivery = normalizeDelivery(deliveryData, homeCountry);
   const theme = normalizeTheme(themeData);
@@ -293,8 +312,14 @@ interface ProductNode {
   status: string;
   description: string;
   seo: { title: string | null; description: string | null };
-  images: {
-    edges: Array<{ node: { id: string; altText: string | null; url: string } }>;
+  media?: {
+    edges: Array<{
+      node: {
+        id?: string;
+        alt?: string | null;
+        image?: { url?: string | null } | null;
+      };
+    }>;
   };
   variants: {
     edges: Array<{
@@ -314,12 +339,22 @@ const FIX_DETAIL_SAMPLE_SIZE = 100;
 const IMAGE_BYTE_SAMPLE_SIZE = 50;
 
 function mapProductNode(p: ProductNode): StoreSnapshot["products"]["sampled"][number] {
-  const images = p.images.edges.map(({ node }) => ({
-    id: node.id,
-    url: node.url,
-    altText: node.altText,
-    bytes: null as number | null,
-  }));
+  const mediaImages =
+    p.media?.edges
+      .map(({ node }) => {
+        const id = node.id;
+        const url = node.image?.url;
+        if (!id || !url) return null;
+        return {
+          id,
+          url,
+          altText: node.alt ?? null,
+          bytes: null as number | null,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null) ?? [];
+
+  const images = mediaImages;
   const variants = p.variants.edges.map(({ node: v }) => ({
     id: v.id,
     sku: v.sku,
@@ -418,13 +453,14 @@ function computeProductStats(
 ): StoreSnapshot["products"]["stats"] {
   if (sampled.length === 0) {
     return {
-      thinDescPct: 0, singleImagePct: 0, missingAltPct: 0, noSkuPct: 0,
+      thinDescPct: 0, singleImagePct: 0, noImagePct: 0, missingAltPct: 0, noSkuPct: 0,
       compareAtBrokenCount: 0, duplicatePairCount: 0, noWeightPct: 0,
       inventoryOffPct: 0, heavyImagePct: 0, handleNoisePct: 0, missingProductSeoPct: 0,
     };
   }
 
   const thinDesc = sampled.filter((p) => p.descriptionLength < 50).length;
+  const noImage = sampled.filter((p) => p.imageCount === 0).length;
   const singleImage = sampled.filter((p) => p.imageCount < 3).length;
   const missingAlt = sampled.filter((p) => p.missingAltCount > 0).length;
   const allVariants = sampled.flatMap((p) => p.variants);
@@ -452,6 +488,7 @@ function computeProductStats(
   return {
     thinDescPct: (thinDesc / sampled.length) * 100,
     singleImagePct: (singleImage / sampled.length) * 100,
+    noImagePct: (noImage / sampled.length) * 100,
     missingAltPct: (missingAlt / sampled.length) * 100,
     noSkuPct: allVariants.length ? (noSku / allVariants.length) * 100 : 0,
     compareAtBrokenCount: compareAtBroken,
@@ -506,10 +543,8 @@ export async function buildPublicSnapshot(
   const handle = shopDomain.replace(".myshopify.com", "");
   const shopUrl = `https://${shopDomain}`;
 
-  const [publicData, mobileData] = await Promise.all([
-    fetchPublicData(shopDomain),
-    runPlaywrightChecks(shopUrl),
-  ]);
+  const publicData = await fetchPublicData(shopDomain);
+  const mobileData = await collectMobileInsights(shopUrl);
 
   return createMinimalSnapshot({
     shop: {
@@ -538,7 +573,7 @@ export async function buildPublicSnapshot(
     pages: publicData.pages,
     products: {
       stats: {
-        thinDescPct: 0, singleImagePct: 0, missingAltPct: 0, noSkuPct: 0,
+        thinDescPct: 0, singleImagePct: 0, noImagePct: 0, missingAltPct: 0, noSkuPct: 0,
         compareAtBrokenCount: 0, duplicatePairCount: 0, noWeightPct: 0,
         inventoryOffPct: 0,
         heavyImagePct: mobileData.heroImageBytes && mobileData.heroImageBytes > 500_000 ? 100 : 0,
@@ -550,17 +585,6 @@ export async function buildPublicSnapshot(
 }
 
 type CaptureHintOrder = { test: boolean; displayFinancialStatus: string };
-
-async function loadAutoCaptureSetting(admin: AdminApiContext): Promise<boolean | null> {
-  try {
-    const data = await graphqlWithRetry<{
-      shop: { paymentSettings: { autoCapture: boolean } };
-    }>(admin, PAYMENT_CAPTURE_QUERY);
-    return data.shop.paymentSettings.autoCapture;
-  } catch {
-    return null;
-  }
-}
 
 async function loadCaptureHintOrders(admin: AdminApiContext): Promise<CaptureHintOrder[]> {
   try {

@@ -2,14 +2,95 @@ import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import prisma from "./prisma.server";
 import { cacheAuditPdfIfPossible } from "./pdf.server";
 
-const ONE_TIME_PRICE = 19.0;
-const SUBSCRIPTION_PRICE = 9.0;
+type GraphqlJson = {
+  data?: any;
+  errors?: Array<{ message: string }>;
+};
+
+function joinErrors(errors: Array<{ message: string }>): string {
+  return errors.map((e) => e.message).join(", ");
+}
+
+/** Test charges in development; live charges in production for real merchant stores. */
+export function isBillingTestMode(): boolean {
+  if (process.env.BILLING_LIVE_CHARGES === "true") return false;
+  if (process.env.BILLING_TEST_CHARGES === "true") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
+/** Development Partner stores must use test charges even when the app runs on production hosting. */
+export async function isShopBillingTestMode(
+  admin: AdminApiContext,
+): Promise<boolean> {
+  if (isBillingTestMode()) return true;
+
+  const response = await admin.graphql(`#graphql
+    query ShopPlan {
+      shop {
+        plan {
+          partnerDevelopment
+        }
+      }
+    }
+  `);
+  const json = (await response.json()) as GraphqlJson;
+  if (json.errors?.length) {
+    console.warn(`[billing] ShopPlan query failed: ${joinErrors(json.errors)}`);
+    return false;
+  }
+  return Boolean(json.data?.shop?.plan?.partnerDevelopment);
+}
+
+export function getBillingAppUrl(): string {
+  return (process.env.SHOPIFY_APP_URL || process.env.APP_URL || "").replace(/\/$/, "");
+}
+
+/** Embedded apps should return to launchUrl after charge approval (Shopify Billing API). */
+export async function getBillingReturnUrl(
+  admin: AdminApiContext,
+  pathnameWithQuery: string,
+  shopDomain: string,
+): Promise<string> {
+  const response = await admin.graphql(`#graphql
+    query AppLaunchUrl {
+      currentAppInstallation {
+        launchUrl
+      }
+    }
+  `);
+  const json = (await response.json()) as GraphqlJson;
+  if (json.errors?.length) {
+    console.warn(
+      `[billing] AppLaunchUrl query failed, falling back to app URL: ${joinErrors(json.errors)}`,
+    );
+  }
+  const launchUrl = String(json.data?.currentAppInstallation?.launchUrl ?? "").replace(
+    /\/$/,
+    "",
+  );
+  const base = launchUrl || getBillingAppUrl();
+  const [path, query = ""] = pathnameWithQuery.split("?");
+  const params = new URLSearchParams(query);
+  params.set("shop", shopDomain);
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${normalizedPath}?${params.toString()}`;
+}
 
 /** Custom/dev apps cannot call the Billing API until the app has public distribution. */
 export function isDevBillingBypassEnabled(): boolean {
   if (process.env.BILLING_DEV_BYPASS === "true") return true;
   if (process.env.BILLING_DEV_BYPASS === "false") return false;
   return process.env.NODE_ENV !== "production";
+}
+
+export async function devGrantOneTimeUnlock(shopDomain: string, auditId: string) {
+  const store = await prisma.store.findUnique({ where: { shopDomain } });
+  if (!store) {
+    throw new Error("Store not found");
+  }
+
+  await grantAuditUnlock(store.id, auditId, `dev-unlock-${auditId}-${Date.now()}`);
+  await cacheAuditPdfIfPossible(auditId);
 }
 
 function parseGraphqlErrors(json: {
@@ -29,30 +110,11 @@ function parseGraphqlErrors(json: {
   return null;
 }
 
-export async function devGrantOneTimeUnlock(shopDomain: string, auditId: string) {
-  const store = await prisma.store.findUnique({ where: { shopDomain } });
-  if (!store) {
-    throw new Error("Store not found");
-  }
-
-  await grantAuditUnlock(store.id, auditId, `dev-unlock-${auditId}-${Date.now()}`);
-  await cacheAuditPdfIfPossible(auditId);
-}
-
-export async function devGrantAuditPlus(shopDomain: string) {
-  const store = await prisma.store.findUnique({ where: { shopDomain } });
-  if (!store) {
-    throw new Error("Store not found");
-  }
-
-  await grantAuditPlus(store.id, `dev-subscription-${Date.now()}`);
-}
-
+/** One-time charges use Admin API directly — Remix billing.request does not support OneTime interval. */
 export async function createOneTimePurchase(
   admin: AdminApiContext,
-  auditId: string,
   returnUrl: string,
-  test = process.env.NODE_ENV !== "production",
+  isTest: boolean,
 ) {
   const response = await admin.graphql(
     `#graphql
@@ -66,9 +128,9 @@ export async function createOneTimePurchase(
     {
       variables: {
         name: "Launch Doctor — Full Report",
-        price: { amount: ONE_TIME_PRICE, currencyCode: "USD" },
+        price: { amount: 19, currencyCode: "USD" },
         returnUrl,
-        test,
+        test: isTest,
       },
     },
   );
@@ -86,50 +148,19 @@ export async function createOneTimePurchase(
   return result as { confirmationUrl: string; appPurchaseOneTime: { id: string } };
 }
 
-export async function createSubscription(
-  admin: AdminApiContext,
-  returnUrl: string,
-  test = process.env.NODE_ENV !== "production",
-) {
-  const response = await admin.graphql(
-    `#graphql
-    mutation AuditPlus($name: String!, $returnUrl: URL!, $test: Boolean, $lineItems: [AppSubscriptionLineItemInput!]!) {
-      appSubscriptionCreate(name: $name, returnUrl: $returnUrl, test: $test, lineItems: $lineItems) {
-        confirmationUrl
-        appSubscription { id status }
-        userErrors { field message }
-      }
-    }`,
-    {
-      variables: {
-        name: "Launch Doctor — Audit Plus",
-        returnUrl,
-        test,
-        lineItems: [
-          {
-            plan: {
-              appRecurringPricingDetails: {
-                price: { amount: SUBSCRIPTION_PRICE, currencyCode: "USD" },
-                interval: "EVERY_30_DAYS",
-              },
-            },
-          },
-        ],
-      },
-    },
-  );
-
-  const json = await response.json();
-  const errorMessage = parseGraphqlErrors(json);
-  if (errorMessage) {
-    throw new Error(errorMessage);
+/** Return URL sends numeric charge_id; Admin API expects a GID. */
+export function appPurchaseOneTimeGid(chargeId: string): string {
+  if (chargeId.startsWith("gid://")) {
+    return chargeId;
   }
+  return `gid://shopify/AppPurchaseOneTime/${chargeId}`;
+}
 
-  const result = json.data?.appSubscriptionCreate;
-  if (!result?.confirmationUrl) {
-    throw new Error("Unable to start subscription — no confirmation URL returned");
+export function appSubscriptionGid(chargeId: string): string {
+  if (chargeId.startsWith("gid://")) {
+    return chargeId;
   }
-  return result as { confirmationUrl: string; appSubscription: { id: string; status: string } };
+  return `gid://shopify/AppSubscription/${chargeId}`;
 }
 
 export async function confirmOneTimePurchase(
@@ -145,10 +176,23 @@ export async function confirmOneTimePurchase(
         }
       }
     }`,
-    { variables: { id: chargeId } },
+    { variables: { id: appPurchaseOneTimeGid(chargeId) } },
   );
-  const json = await response.json();
+  const json = (await response.json()) as GraphqlJson;
+  if (json.errors?.length) {
+    console.warn(`[billing] ConfirmPurchase query failed: ${joinErrors(json.errors)}`);
+    return false;
+  }
   return json.data?.node?.status === "ACTIVE";
+}
+
+export async function devGrantAuditPlus(shopDomain: string) {
+  const store = await prisma.store.findUnique({ where: { shopDomain } });
+  if (!store) {
+    throw new Error("Store not found");
+  }
+
+  await grantAuditPlus(store.id, `dev-subscription-${Date.now()}`);
 }
 
 export async function grantAuditUnlock(
@@ -178,6 +222,10 @@ export async function getActiveSubscription(storeId: string) {
 }
 
 export async function hasAuditPlus(storeId: string): Promise<boolean> {
+  // Promotion mode: everything is free for all stores.
+  const { isPromotionActive } = await import("./admin.server");
+  if (await isPromotionActive()) return true;
+
   const sub = await getActiveSubscription(storeId);
   if (sub) return true;
 
@@ -202,37 +250,6 @@ export async function revokeAuditPlus(storeId: string, subscriptionId: string) {
       where: { storeId, type: "AUDIT_PLUS_MONTHLY" },
     }),
   ]);
-}
-
-export async function cancelAuditPlusSubscription(
-  admin: AdminApiContext,
-  storeId: string,
-  subscriptionId: string,
-) {
-  const response = await admin.graphql(
-    `#graphql
-    mutation AppSubscriptionCancel($id: ID!) {
-      appSubscriptionCancel(id: $id) {
-        appSubscription { id status }
-        userErrors { field message }
-      }
-    }`,
-    { variables: { id: subscriptionId } },
-  );
-
-  const json = await response.json();
-  const errorMessage = parseGraphqlErrors(json);
-  if (errorMessage) {
-    throw new Error(errorMessage);
-  }
-
-  const result = json.data?.appSubscriptionCancel;
-  if (!result?.appSubscription) {
-    throw new Error("Unable to cancel subscription — no response from Shopify.");
-  }
-
-  await revokeAuditPlus(storeId, subscriptionId);
-  return result.appSubscription as { id: string; status: string };
 }
 
 export async function devCancelAuditPlus(shopDomain: string) {

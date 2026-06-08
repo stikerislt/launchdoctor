@@ -3,6 +3,11 @@ import {
   parseProductSeoUpdates,
 } from "../../app/lib/fixes/product-seo.server";
 import {
+  productSeoEditTouched,
+  productSeoInitialEditState,
+  productSeoSavable,
+} from "../../app/lib/fixes/product-seo-ui";
+import {
   humanizeProductHandle,
   isGenericProductTitle,
   suggestProductTitle,
@@ -27,15 +32,31 @@ const products: SnapshotProduct[] = [
 ];
 
 describe("product-seo fix helpers", () => {
+  it("allows saving only products the merchant edited", () => {
+    const drafts = buildProductSeoDrafts(products, "Northward Systems");
+    const untouched = productSeoInitialEditState(drafts[1]!);
+    const edited = {
+      productTitle: drafts[0]!.suggestedProductTitle,
+      seoTitle: drafts[0]!.suggestedSeoTitle,
+      seoDescription: drafts[0]!.suggestedSeoDescription,
+    };
+
+    expect(productSeoEditTouched(drafts[1]!, untouched)).toBe(false);
+    expect(productSeoSavable(drafts[1]!, untouched)).toBe(false);
+    expect(productSeoSavable(drafts[0]!, edited)).toBe(true);
+  });
+
   it("builds editable drafts with suggested copy for missing fields", () => {
     const drafts = buildProductSeoDrafts(products, "Northward Systems");
 
     expect(drafts).toHaveLength(2);
     expect(drafts[0]?.hasBadProductTitle).toBe(true);
     expect(drafts[0]?.suggestedProductTitle).toBe("Trail Pack");
-    expect(drafts[0]?.seoTitle).toContain("Trail Pack");
+    expect(drafts[0]?.suggestedSeoTitle).toContain("Trail Pack");
+    expect(drafts[0]?.currentSeoTitle).toBe("");
     expect(drafts[1]?.missingTitle).toBe(false);
     expect(drafts[1]?.missingDescription).toBe(true);
+    expect(drafts[1]?.currentSeoTitle).toBe("Summit Bottle");
   });
 
   it("parses submitted product SEO updates for allowed products", () => {
@@ -98,5 +119,11 @@ describe("product naming helpers", () => {
   it("suggests a handle-based product title", () => {
     expect(suggestProductTitle("Product 2", "trail-pack")).toBe("Trail Pack");
     expect(humanizeProductHandle("summit-bottle")).toBe("Summit Bottle");
+  });
+
+  it("never suggests a still-generic product title", () => {
+    const suggested = suggestProductTitle("Product 2", "product-2");
+    expect(isGenericProductTitle(suggested)).toBe(false);
+    expect(suggested.length).toBeGreaterThan(0);
   });
 });

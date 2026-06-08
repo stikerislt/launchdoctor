@@ -18,8 +18,8 @@ function fail(msg: string) {
 const ruleFiles = readdirSync(RULES_DIR).filter(
   (f) => f.endsWith(".ts") && f !== "index.ts",
 );
-if (ruleFiles.length !== 50) {
-  fail(`Expected 50 rule files, found ${ruleFiles.length}`);
+if (ruleFiles.length !== 51) {
+  fail(`Expected 51 rule files, found ${ruleFiles.length}`);
 }
 
 const ids = new Set<number>();

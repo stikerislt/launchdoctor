@@ -15,7 +15,10 @@ automatically_update_urls_on_dev = true
 include_config_on_deploy = true
 
 [access_scopes]
-scopes = "read_products,read_inventory,read_orders,read_locations,read_shipping,read_themes,read_content,read_online_store_pages,read_legal_policies,read_payment_terms,read_shopify_payments_payouts,read_customers,read_files,write_products,write_files"
+scopes = "read_content,read_files,read_inventory,read_legal_policies,read_locations,read_online_store_pages,read_orders,read_products,read_shipping,read_themes,write_content,write_files,write_inventory,write_products"
 
 [auth]
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [
+  "https://shopify.dev/apps/default-app-home/auth/callback",
+  "https://shopify.dev/apps/default-app-home/auth/shopify/callback",
+]

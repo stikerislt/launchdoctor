@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import { buildPublicSnapshot } from "../../collector/snapshot-builder";
 import { runAllowlistedRules } from "../../audit-engine/engine";
 import { computeLaunchScore } from "../../audit-engine/engine";
@@ -65,18 +65,19 @@ export default function PublicScanner() {
       <div style={{ marginTop: 40, padding: 24, background: "#f6f6f7", borderRadius: 8 }}>
         <h2>Want all 50 checks?</h2>
         <p>Install Launch Doctor to scan fraud risk, shipping, products, checkout, and more.</p>
-        <Form method="post" action="/scan/subscribe">
-          <input
-            type="email"
-            name="email"
-            placeholder="your@email.com"
-            required
-            style={{ padding: 8, marginRight: 8, width: 250 }}
-          />
-          <button type="submit" style={{ padding: "8px 16px", background: "#008060", color: "#fff", border: "none", borderRadius: 4 }}>
-            Get full audit
-          </button>
-        </Form>
+        <a
+          href="/"
+          style={{
+            display: "inline-block",
+            padding: "8px 16px",
+            background: "#008060",
+            color: "#fff",
+            borderRadius: 4,
+            textDecoration: "none",
+          }}
+        >
+          Install Launch Doctor
+        </a>
       </div>
     </div>
   );

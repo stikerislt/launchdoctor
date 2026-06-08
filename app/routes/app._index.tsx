@@ -1,6 +1,14 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useSubmit, useNavigation, useNavigate } from "@remix-run/react";
+import {
+  Link,
+  useLoaderData,
+  useSubmit,
+  useNavigation,
+  useNavigate,
+  useRevalidator,
+} from "@remix-run/react";
+import { useEffect, useRef } from "react";
 import {
   Page,
   Layout,
@@ -38,6 +46,15 @@ import { getScanScopeFromSnapshot } from "../lib/scan-scope";
 import { DashboardNavCards } from "../components/DashboardNavCards";
 import { PillarIssueSummary } from "../components/PillarIssueSummary";
 import { shopifyAppPath } from "../lib/app-routes";
+import { APP_ICON_SRC } from "../lib/assets";
+import { isAdmin } from "../lib/admin.server";
+
+// A RUNNING audit may legitimately take a while on large catalogs, so give it a
+// generous window. A PENDING audit means the worker never even picked the job up,
+// so a much shorter window is safe — without this, a never-processed job would
+// leave the dashboard spinner up forever.
+const RUNNING_STALE_MS = 10 * 60 * 1000;
+const PENDING_STALE_MS = 3 * 60 * 1000;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -45,51 +62,60 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   let store = await prisma.store.findUnique({
     where: { shopDomain },
-    include: {
-      audits: {
-        orderBy: { completedAt: "desc" },
-        take: 1,
-        select: {
-          id: true,
-          status: true,
-          launchScore: true,
-          isUnlocked: true,
-          completedAt: true,
-          snapshot: true,
-          findings: {
-            select: { id: true, severity: true, ruleCode: true, title: true },
-          },
-        },
-      },
-    },
   });
 
   if (!store) {
     store = await prisma.store.create({
       data: { shopDomain },
-      include: {
-        audits: {
-          orderBy: { completedAt: "desc" },
-          take: 1,
-          select: {
-            id: true,
-            status: true,
-            launchScore: true,
-            isUnlocked: true,
-            completedAt: true,
-            snapshot: true,
-            findings: {
-              select: { id: true, severity: true, ruleCode: true, title: true },
-            },
-          },
-        },
-      },
     });
   }
 
-  const latestAuditRaw = store.audits[0] ?? null;
-  const dismissedFixIds = await getDismissedFixIds(store.id);
-  const dismissedRuleCodes = await getDismissedRuleCodes(store.id);
+  const auditSelect = {
+    id: true,
+    status: true,
+    launchScore: true,
+    isUnlocked: true,
+    completedAt: true,
+    snapshot: true,
+    findings: {
+      select: { id: true, severity: true, ruleCode: true, title: true },
+    },
+  } as const;
+
+  const now = Date.now();
+  const runningStaleBefore = new Date(now - RUNNING_STALE_MS);
+  const pendingStaleBefore = new Date(now - PENDING_STALE_MS);
+
+  // Independent reads run in parallel to cut per-load latency on the remote DB.
+  const [
+    latestAuditRaw,
+    dismissedFixIds,
+    dismissedRuleCodes,
+    staleAudits,
+    auditCount,
+    auditPlusActive,
+  ] = await Promise.all([
+    prisma.audit.findFirst({
+      where: { storeId: store.id, status: "COMPLETED" },
+      orderBy: { completedAt: "desc" },
+      select: auditSelect,
+    }),
+    getDismissedFixIds(store.id),
+    getDismissedRuleCodes(store.id),
+    prisma.audit.findMany({
+      where: {
+        storeId: store.id,
+        OR: [
+          { status: "RUNNING", startedAt: { lt: runningStaleBefore } },
+          { status: "PENDING", createdAt: { lt: pendingStaleBefore } },
+        ],
+      },
+      select: { id: true },
+    }),
+    prisma.audit.count({ where: { storeId: store.id } }),
+    hasAuditPlus(store.id),
+  ]);
+
   const scores = latestAuditRaw
     ? resolveScoresFromFindings(
         latestAuditRaw.findings,
@@ -112,12 +138,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     : null;
 
+  if (staleAudits.length > 0) {
+    await prisma.audit.updateMany({
+      where: { id: { in: staleAudits.map((a) => a.id) } },
+      data: {
+        status: "FAILED",
+        errorMessage:
+          "Audit timed out waiting for the background worker. Please run it again.",
+      },
+    });
+  }
+
+  // Must run after the stale-timeout update so timed-out audits aren't reported as running.
   const runningAudit = await prisma.audit.findFirst({
     where: { storeId: store.id, status: { in: ["PENDING", "RUNNING"] } },
+    select: { id: true },
   });
 
-  const auditPlusActive = await hasAuditPlus(store.id);
   const latestCompleted = latestAudit?.status === "COMPLETED" ? latestAudit : null;
+  // Surface a clear "just finished" confirmation when a merchant returns right after
+  // a fast scan — otherwise the absence of a spinner can read as "nothing happened".
+  const justCompleted = Boolean(
+    latestCompleted?.completedAt &&
+      now - new Date(latestCompleted.completedAt).getTime() < 2 * 60 * 1000,
+  );
   const activeFindings = latestCompleted
     ? filterFindingsByDismissals(latestCompleted.findings, dismissedRuleCodes)
     : [];
@@ -141,23 +185,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const scanScope = latestCompleted
     ? getScanScopeFromSnapshot(latestCompleted.snapshot)
     : null;
+  const totalFindingCount = latestCompleted?.findings.length ?? 0;
+  const activeFindingCount = activeFindings.length;
 
   return json({
     shopHandle: getShopHandle(shopDomain),
     shopDomain,
     latestAudit: latestCompleted,
     runningAudit,
-    hasAudits: store.audits.length > 0,
+    hasAudits: auditCount > 0,
+    justCompleted,
     auditPlusActive,
     fixCount,
     pillars,
     previewFindings,
     previewFindingCount: PREVIEW_FINDING_COUNT,
     reportFullyUnlocked,
+    totalFindingCount,
+    activeFindingCount,
     lockedFindingCount: latestCompleted
       ? Math.max(0, activeFindings.length - PREVIEW_FINDING_COUNT)
       : 0,
     scanScope,
+    isAdminUser: isAdmin(session.email),
   });
 };
 
@@ -173,7 +223,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     data: { storeId: store.id, status: "PENDING", triggeredBy: "MANUAL" },
   });
 
-  await enqueueAudit(audit.id);
+  try {
+    await enqueueAudit(audit.id, store.id);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not queue audit job.";
+    await prisma.audit.update({
+      where: { id: audit.id },
+      data: {
+        status: "FAILED",
+        errorMessage: `Queue error: ${message}. Ensure DATABASE_URL is set and migrations have run.`,
+      },
+    });
+    return redirect(
+      shopifyAppPath(`/app/audit/${audit.id}?queueError=1`, session.shop),
+    );
+  }
+
   return redirect(shopifyAppPath(`/app/audit/${audit.id}`, session.shop));
 };
 
@@ -182,6 +248,7 @@ export default function Dashboard() {
     latestAudit,
     runningAudit,
     hasAudits,
+    justCompleted,
     shopDomain,
     auditPlusActive,
     fixCount,
@@ -191,15 +258,38 @@ export default function Dashboard() {
     reportFullyUnlocked,
     lockedFindingCount,
     scanScope,
+    totalFindingCount,
+    activeFindingCount,
+    isAdminUser,
   } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const navigation = useNavigation();
   const navigate = useNavigate();
+  const revalidator = useRevalidator();
   const isRunning = navigation.state === "submitting" || !!runningAudit;
+
+  // While an audit is queued/running, the loader doesn't re-run on its own, so the
+  // "Audit in progress" spinner would stay up until the merchant manually reloads.
+  // Poll so the dashboard resolves to the finished report (or a failure banner) on
+  // its own — the loader's stale sweep also fails out jobs the worker never picked up.
+  const runningAuditId = runningAudit?.id ?? null;
+  const revalidatorRef = useRef(revalidator);
+  revalidatorRef.current = revalidator;
+  useEffect(() => {
+    if (!runningAuditId) return;
+    const interval = setInterval(() => {
+      if (revalidatorRef.current.state === "idle") {
+        revalidatorRef.current.revalidate();
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [runningAuditId]);
 
   const reportPath = latestAudit
     ? shopifyAppPath(`/app/audit/${latestAudit.id}`, shopDomain)
-    : null;
+    : runningAudit
+      ? shopifyAppPath(`/app/audit/${runningAudit.id}`, shopDomain)
+      : null;
   const fixesPath = latestAudit
     ? shopifyAppPath(`/app/fixes/${latestAudit.id}`, shopDomain)
     : null;
@@ -212,11 +302,15 @@ export default function Dashboard() {
       title: "Latest audit report",
       description: reportFullyUnlocked
         ? "Full findings, category filters, and PDF export."
-        : `See all ${pillars?.totalCount ?? 0} issues — ${previewFindingCount} unlocked free.`,
-      actionLabel: "Open report",
-      onAction: () => reportPath && navigate(reportPath),
+        : totalFindingCount === 0
+          ? "Your last completed scan found no issues."
+          : activeFindingCount < totalFindingCount
+            ? `${totalFindingCount} findings in report (${activeFindingCount} active) — ${previewFindingCount} with full fix steps free.`
+            : `${totalFindingCount} findings — ${previewFindingCount} with full fix steps free.`,
+      actionLabel: runningAudit && !latestAudit ? "View scan progress" : "Open report",
+      to: reportPath ?? undefined,
       primary: true,
-      badge: latestAudit ? "Start here" : undefined,
+      badge: latestAudit ? "Start here" : runningAudit ? "In progress" : undefined,
     },
     {
       title: "Fix Center",
@@ -233,6 +327,15 @@ export default function Dashboard() {
       badge: auditPlusActive ? "Subscriber" : "Fixes locked",
     },
     {
+      title: "Image Optimizer",
+      description: latestAudit
+        ? "Resize and compress oversized product images to WebP in one batch."
+        : "Run an audit first to detect oversized images.",
+      actionLabel: "Open Image Optimizer",
+      onAction: () => navigate(shopifyAppPath("/app/image-optimizer", shopDomain)),
+      badge: latestAudit ? "New" : undefined,
+    },
+    {
       title: "Audit Plus hub",
       description: "Monitoring, theme-change rescans, and subscription tools.",
       actionLabel: "Open hub",
@@ -244,6 +347,17 @@ export default function Dashboard() {
       actionLabel: "View history",
       onAction: () => navigate(shopifyAppPath("/app/history", shopDomain)),
     },
+    ...(isAdminUser
+      ? [
+          {
+            title: "Admin Panel",
+            description: "Manage promotion mode and view platform stats.",
+            actionLabel: "Open Admin",
+            onAction: () => navigate(shopifyAppPath("/app/admin", shopDomain)),
+            badge: "Admin only",
+          } as const,
+        ]
+      : []),
   ];
 
   return (
@@ -255,7 +369,7 @@ export default function Dashboard() {
             <div className="ld-hero-content">
               <img
                 className="ld-hero-logo"
-                src="/launch-doctor-icon.png"
+                src={APP_ICON_SRC}
                 alt="Launch Doctor"
                 width={80}
                 height={80}
@@ -295,7 +409,7 @@ export default function Dashboard() {
                   <div className="ld-dashboard-top-main">
                     <div className="ld-dashboard-brand">
                       <img
-                        src="/launch-doctor-icon.png"
+                        src={APP_ICON_SRC}
                         alt=""
                         width={40}
                         height={40}
@@ -309,8 +423,23 @@ export default function Dashboard() {
                     <div className="ld-dashboard-top-body">
                       {runningAudit && (
                         <Banner tone="info">
-                          Audit in progress… We scan your full catalog and sitemap — usually
-                          1–2 minutes.
+                          Audit in progress… Most scans finish in under a minute (large
+                          catalogs can take a couple of minutes). You can safely leave this
+                          page — the scan keeps running in the background and your report
+                          appears here automatically when it&rsquo;s done.
+                        </Banner>
+                      )}
+
+                      {!runningAudit && justCompleted && (
+                        <Banner tone="success" title="Audit complete">
+                          Your scan finished and your Launch Score is ready below.
+                        </Banner>
+                      )}
+
+                      {!runningAudit && !latestAudit && (
+                        <Banner tone="warning" title="No completed audits yet">
+                          Your previous scan didn’t finish. Run the audit again to
+                          generate your Launch Score and findings.
                         </Banner>
                       )}
 
@@ -406,7 +535,7 @@ export default function Dashboard() {
                         <Text as="p" variant="bodyMd" tone="subdued">
                           {reportFullyUnlocked
                             ? "Your report is fully unlocked."
-                            : `${previewFindingCount} of ${pillars?.totalCount ?? latestAudit.findings.length} findings include fix steps on the free plan.`}
+                            : `${previewFindingCount} of ${totalFindingCount} findings include fix steps on the free plan.`}
                         </Text>
                       </BlockStack>
                       {!reportFullyUnlocked && lockedFindingCount > 0 && (
@@ -435,9 +564,9 @@ export default function Dashboard() {
                     </div>
 
                     {reportPath && (
-                      <Button onClick={() => navigate(reportPath)}>
-                        View full audit report
-                      </Button>
+                      <Link to={reportPath} style={{ textDecoration: "none" }}>
+                        <Button>View full audit report</Button>
+                      </Link>
                     )}
                   </BlockStack>
                 </Card>

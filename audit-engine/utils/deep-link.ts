@@ -22,6 +22,8 @@ export const ADMIN_PATHS = {
   products: "/products",
   pages: "/pages",
   messaging: "/apps/shopify-messaging",
+  // URL redirects live under Content → Menus → "View URL Redirects".
+  redirects: "/content/redirects",
 } as const;
 
 /** @deprecated Use legalLink — /settings/policies is not a valid admin route */
@@ -80,6 +82,19 @@ export function productsLink(handle: string) {
   return buildDeepLink(handle, ADMIN_PATHS.products);
 }
 
+/**
+ * Deep link to a single product's admin page. `productId` may be a Shopify GID
+ * (gid://shopify/Product/123) or a bare numeric id; falls back to the products
+ * list when no numeric id can be resolved.
+ */
+export function productAdminLink(handle: string, productId: string) {
+  const numeric = String(productId).match(/\d+$/)?.[0];
+  return buildDeepLink(
+    handle,
+    numeric ? `${ADMIN_PATHS.products}/${numeric}` : ADMIN_PATHS.products,
+  );
+}
+
 export function locationsLink(handle: string) {
   return buildDeepLink(handle, ADMIN_PATHS.locations);
 }
@@ -98,6 +113,10 @@ export function onlineStorePreferencesLink(handle: string) {
 
 export function pagesLink(handle: string) {
   return buildDeepLink(handle, ADMIN_PATHS.pages);
+}
+
+export function redirectsLink(handle: string) {
+  return buildDeepLink(handle, ADMIN_PATHS.redirects);
 }
 
 export function messagingLink(handle: string) {
@@ -133,6 +152,7 @@ export const RULE_DEEP_LINKS: Record<string, LinkBuilder> = {
   PDP_NO_DELIVERY_DATE: themesLink,
   PROD_THIN_DESC: productsLink,
   PROD_SINGLE_IMAGE: productsLink,
+  PROD_NO_IMAGE: productsLink,
   PROD_MISSING_ALT: productsLink,
   PROD_NO_SKU: productsLink,
   PROD_PRICE_OUTLIER: productsLink,

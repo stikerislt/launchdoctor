@@ -23,6 +23,7 @@ import {
 import { AppPage } from "../components/AppPage";
 import { AppBrandHeader } from "../components/AppBrandHeader";
 import { shopifyAppPath } from "../lib/app-routes";
+import type { FixId } from "../lib/fixes/types";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -42,26 +43,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   const latestAuditRaw = store?.audits[0] ?? null;
-  const auditPlusActive = store ? await hasAuditPlus(store.id) : false;
-  const dismissedFixIds = store ? await getDismissedFixIds(store.id) : new Set();
-  const dismissedRuleCodes = store ? await getDismissedRuleCodes(store.id) : new Set();
+
+  // These reads are independent of each other — run them in parallel so the
+  // page transition isn't blocked on a chain of remote-DB round-trips.
+  const [auditPlusActive, dismissedFixIds, dismissedRuleCodes, lastThemeAudit, runningAudit] =
+    store
+      ? await Promise.all([
+          hasAuditPlus(store.id),
+          getDismissedFixIds(store.id),
+          getDismissedRuleCodes(store.id),
+          prisma.audit.findFirst({
+            where: { storeId: store.id, triggeredBy: "WEBHOOK_THEME_PUBLISH" },
+            orderBy: { completedAt: "desc" },
+          }),
+          prisma.audit.findFirst({
+            where: { storeId: store.id, status: { in: ["PENDING", "RUNNING"] } },
+          }),
+        ])
+      : ([false, new Set<FixId>(), new Set<string>(), null, null] as [
+          boolean,
+          Set<FixId>,
+          Set<string>,
+          Awaited<ReturnType<typeof prisma.audit.findFirst>>,
+          Awaited<ReturnType<typeof prisma.audit.findFirst>>,
+        ]);
+
   const fixCount =
     latestAuditRaw && auditPlusActive
       ? buildFixPreviews(latestAuditRaw.snapshot, dismissedFixIds).length
       : 0;
-
-  const lastThemeAudit = store
-    ? await prisma.audit.findFirst({
-        where: { storeId: store.id, triggeredBy: "WEBHOOK_THEME_PUBLISH" },
-        orderBy: { completedAt: "desc" },
-      })
-    : null;
-
-  const runningAudit = store
-    ? await prisma.audit.findFirst({
-        where: { storeId: store.id, status: { in: ["PENDING", "RUNNING"] } },
-      })
-    : null;
 
   const latestScores = latestAuditRaw
     ? resolveScoresFromFindings(
@@ -164,6 +174,32 @@ export default function AuditPlusHub() {
           </Text>
 
           <div className="ld-tool-grid">
+            <div className={`ld-tool-card ${auditPlusActive ? "ld-tool-card--primary" : ""}`}>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="start">
+                  <Text as="h3" variant="headingSm">
+                    Store Monitor
+                  </Text>
+                  <Badge>New</Badge>
+                </InlineStack>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Your store&apos;s health over time — Launch Score trend, catalog guardrails,
+                  PageSpeed mobile score, and broken links, with alerts when something changes.
+                  Re-scans run automatically every week.
+                </Text>
+                {auditPlusActive ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate(shopifyAppPath("/app/monitor", shopDomain))}
+                  >
+                    Open Store Monitor
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate(billingPath)}>Unlock with Audit Plus</Button>
+                )}
+              </BlockStack>
+            </div>
+
             <div
               className={`ld-tool-card ${auditPlusActive && fixesPath ? "ld-tool-card--primary" : ""}`}
             >
@@ -213,6 +249,87 @@ export default function AuditPlusHub() {
                       )}
                     </InlineStack>
                   </BlockStack>
+                )}
+              </BlockStack>
+            </div>
+
+            <div className="ld-tool-card">
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="start">
+                  <Text as="h3" variant="headingSm">
+                    Mobile PageSpeed
+                  </Text>
+                  <Badge>New</Badge>
+                </InlineStack>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Run Google PageSpeed Insights on your live storefront — real mobile Lighthouse
+                  performance scores, shown in Store Monitor and updated whenever you re-scan.
+                </Text>
+                {auditPlusActive ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate(shopifyAppPath("/app/pagespeed", shopDomain))}
+                  >
+                    Open Mobile PageSpeed
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate(billingPath)}>Unlock with Audit Plus</Button>
+                )}
+              </BlockStack>
+            </div>
+
+            <div className="ld-tool-card">
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="start">
+                  <Text as="h3" variant="headingSm">
+                    Image Optimizer
+                  </Text>
+                  <Badge>New</Badge>
+                </InlineStack>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Resize oversized product images (max 2048px wide) and convert them to
+                  WebP in one batch. See exactly how many KB you saved per image.
+                </Text>
+                {auditPlusActive && latestAudit ? (
+                  <Button
+                    variant="primary"
+                    onClick={() =>
+                      navigate(shopifyAppPath("/app/image-optimizer", shopDomain))
+                    }
+                  >
+                    Open Image Optimizer
+                  </Button>
+                ) : auditPlusActive ? (
+                  <Button onClick={() => navigate(shopifyAppPath("/app", shopDomain))}>
+                    Run an audit first
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate(billingPath)}>Unlock with Audit Plus</Button>
+                )}
+              </BlockStack>
+            </div>
+
+            <div className="ld-tool-card">
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="start">
+                  <Text as="h3" variant="headingSm">
+                    Broken Link Finder
+                  </Text>
+                  <Badge>New</Badge>
+                </InlineStack>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Scan your products, pages, blog posts, and homepage for dead links and broken
+                  images, with step-by-step instructions on where and how to fix each one.
+                </Text>
+                {auditPlusActive ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate(shopifyAppPath("/app/links", shopDomain))}
+                  >
+                    Open Broken Link Finder
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate(billingPath)}>Unlock with Audit Plus</Button>
                 )}
               </BlockStack>
             </div>
@@ -286,12 +403,8 @@ export default function AuditPlusHub() {
                     : " No theme-triggered scan yet.")}
               </List.Item>
               <List.Item>
-                <InlineStack gap="200" blockAlign="center">
-                  <span>
-                    <strong>Weekly auto-rescans</strong> — scheduled full-store scans
-                  </span>
-                  <Badge tone="attention">Coming soon</Badge>
-                </InlineStack>
+                <strong>Weekly auto-rescans</strong> — Store Monitor runs a full-store scan
+                every week and flags anything that changed since the last one.
               </List.Item>
             </List>
           </BlockStack>

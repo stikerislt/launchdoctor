@@ -1,10 +1,13 @@
+import { Link } from "@remix-run/react";
 import { Button, Card, InlineStack, Text, BlockStack } from "@shopify/polaris";
 
 export type DashboardNavCard = {
   title: string;
   description: string;
   actionLabel: string;
-  onAction: () => void;
+  /** Prefer `to` for in-app navigation (works reliably in embedded Shopify admin). */
+  to?: string;
+  onAction?: () => void;
   primary?: boolean;
   badge?: string;
 };
@@ -26,9 +29,21 @@ export function DashboardNavCards({ cards }: { cards: DashboardNavCard[] }) {
             <Text as="p" variant="bodyMd" tone="subdued">
               {card.description}
             </Text>
-            <Button variant={card.primary ? "primary" : undefined} onClick={card.onAction}>
-              {card.actionLabel}
-            </Button>
+            {card.to ? (
+              <Link to={card.to} style={{ textDecoration: "none" }}>
+                <Button variant={card.primary ? "primary" : undefined}>
+                  {card.actionLabel}
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant={card.primary ? "primary" : undefined}
+                onClick={card.onAction}
+                disabled={!card.onAction}
+              >
+                {card.actionLabel}
+              </Button>
+            )}
           </BlockStack>
         </Card>
       ))}

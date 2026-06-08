@@ -7,6 +7,8 @@ import {
   getMissingProductSeoTargets,
   getMissingSkuTargets,
   getMissingTrustPages,
+  getNoImageTargets,
+  getPngImageTargets,
   getSnapshotProducts,
   getThinDescriptionTargets,
   homepageSeoNeedsFix,
@@ -14,6 +16,7 @@ import {
   suggestHomepageDescriptions,
   suggestHomepageTitles,
 } from "./snapshot.server";
+import { productAdminLink, productsLink } from "../../../audit-engine/utils/deep-link";
 import { buildProductSeoDrafts } from "./product-seo.server";
 import { getProductSeoFixTargets } from "./snapshot.server";
 
@@ -70,6 +73,26 @@ export function buildFixPreviews(
     });
   }
 
+  const pngTargets = getPngImageTargets(products);
+  if (pngTargets.length > 0) {
+    pushIfActive({
+      id: "convert-png-to-webp",
+      ruleCodes: ["PROD_PNG_FORMAT"],
+      title: "Convert PNG images to WebP",
+      description:
+        "Converts all PNG product images to WebP format for smaller file sizes at the same visual quality. Improves page load speed.",
+      itemCount: pngTargets.length,
+      items: pngTargets.slice(0, 8).map((target) => ({
+        id: target.imageId,
+        label: target.productTitle,
+        detail: target.bytes
+          ? `${Math.round(target.bytes / 1024)} KB PNG`
+          : "PNG format",
+        meta: { bytes: target.bytes },
+      })),
+    });
+  }
+
   if (homepageSeoNeedsFix(snapshot)) {
     pushIfActive(buildHomepageSeoPreview(snapshot));
   }
@@ -82,7 +105,7 @@ export function buildFixPreviews(
       ruleCodes: ["SEO_PRODUCT_META"],
       title: "Fill missing product SEO titles & descriptions",
       description:
-        "Rename generic products like “Product 2”, then review SEO titles and meta descriptions before saving in one click.",
+        "Review suggested product names and SEO copy, fill fields with one click, edit if needed, then save to Shopify.",
       itemCount: seoTargets.length,
       productSeoDrafts,
       items: productSeoDrafts.slice(0, 8).map((draft) => ({
@@ -95,6 +118,28 @@ export function buildFixPreviews(
         ]
           .filter(Boolean)
           .join(" · ") || "Needs SEO review",
+      })),
+    });
+  }
+
+  const noImageTargets = getNoImageTargets(products);
+  if (noImageTargets.length > 0) {
+    const handle = snapshot.shop.handle;
+    pushIfActive({
+      id: "add-product-images",
+      ruleCodes: ["PROD_NO_IMAGE"],
+      title: "Add images to products with no photo",
+      description:
+        "These products have no image at all. We can't generate photos for you, but here's a direct link to each one's Media section so you can upload images fast.",
+      itemCount: noImageTargets.length,
+      guided: true,
+      guidedActionUrl: productsLink(handle),
+      guidedActionLabel: "Open Products in Shopify",
+      items: noImageTargets.slice(0, 12).map((product) => ({
+        id: product.id,
+        label: product.title,
+        detail: "No image",
+        adminUrl: productAdminLink(handle, product.id),
       })),
     });
   }

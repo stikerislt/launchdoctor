@@ -1,6 +1,7 @@
 import type { AdminApiContext } from "@shopify/shopify-app-remix/server";
 import type { FixResult } from "./types";
 import { adminGraphql } from "./graphql.server";
+import { resolveProductMediaId } from "./product-media.server";
 import {
   getMissingAltTargets,
   getSnapshotProducts,
@@ -45,12 +46,23 @@ export async function applyAltTextFix(
 
   for (const [productId, productTargets] of byProduct) {
     try {
+      const mediaUpdates: Array<{ id: string; alt: string }> = [];
+      for (const target of productTargets) {
+        const mediaId = await resolveProductMediaId(
+          admin,
+          productId,
+          target.imageUrl ?? "",
+          target.imageId,
+        );
+        if (!mediaId) {
+          throw new Error(`Could not resolve media for image on ${target.productTitle}.`);
+        }
+        mediaUpdates.push({ id: mediaId, alt: target.suggestedAlt });
+      }
+
       await adminGraphql(admin, PRODUCT_UPDATE_MEDIA, {
         productId,
-        media: productTargets.map((target) => ({
-          id: target.imageId,
-          alt: target.suggestedAlt,
-        })),
+        media: mediaUpdates,
       });
       appliedCount += productTargets.length;
     } catch (error) {

@@ -114,6 +114,7 @@ export function createBaseSnapshot(
       stats: {
         thinDescPct: 0,
         singleImagePct: 0,
+        noImagePct: 0,
         missingAltPct: 0,
         noSkuPct: 0,
         compareAtBrokenCount: 0,
