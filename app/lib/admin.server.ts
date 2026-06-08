@@ -1,11 +1,13 @@
 import prisma from "./prisma.server";
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "leveris.sigitas@gmail.com";
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "leveris.sigitas@gmail.com,northwardsystems@gmail.com")
+  .split(",")
+  .map((e) => e.trim().toLowerCase());
 
-/** Returns true if the current session email matches the admin email. */
+/** Returns true if the current session email is in the admin list. */
 export function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
-  return email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
 /** Read a global app setting (key-value). Returns null if not set. */
