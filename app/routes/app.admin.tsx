@@ -18,6 +18,7 @@ import {
   enablePromotion,
   disablePromotion,
   getSetting,
+  setSetting,
 } from "../lib/admin.server";
 import { AppPage } from "../components/AppPage";
 
@@ -29,10 +30,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Response("Not authorized", { status: 403 });
   }
 
-  const [promotionActive, promotionEndsAt, storeCount, auditCount, plusCount] =
+  const [promotionActive, promotionEndsAt, promotionMessage, storeCount, auditCount, plusCount] =
     await Promise.all([
       isPromotionActive(),
       getSetting("promotion_ends_at"),
+      getSetting("promotion_message"),
       prisma.store.count({ where: { uninstalledAt: null } }),
       prisma.audit.count(),
       prisma.subscription.count({ where: { status: "ACTIVE" } }),
@@ -43,6 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     email,
     promotionActive,
     promotionEndsAt,
+    promotionMessage,
     storeCount,
     auditCount,
     plusCount,
@@ -82,6 +85,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ success: true, message: "Promotion disabled." });
   }
 
+  if (intent === "save-message") {
+    const message = String(formData.get("message") ?? "").trim();
+    await setSetting("promotion_message", message);
+    return json({ success: true, message: "Banner message saved." });
+  }
+
   return json({ error: "Unknown action." });
 };
 
@@ -91,6 +100,7 @@ export default function AdminPanel() {
     email,
     promotionActive,
     promotionEndsAt,
+    promotionMessage,
     storeCount,
     auditCount,
     plusCount,
@@ -207,6 +217,47 @@ export default function AdminPanel() {
                 </InlineStack>
               </Form>
             )}
+          </BlockStack>
+        </Card>
+
+        {/* ── Banner Message ── */}
+        <Card>
+          <BlockStack gap="300">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">
+                Banner Message
+              </Text>
+              <Text as="p" variant="bodyMd" tone="subdued">
+                Custom text shown on every store&rsquo;s dashboard when promotion
+                is active. Leave empty for the default message.
+              </Text>
+            </BlockStack>
+            <Form method="post">
+              <input type="hidden" name="intent" value="save-message" />
+              <BlockStack gap="300">
+                <div className="ld-admin-textarea-field">
+                  <label htmlFor="message">Message</label>
+                  <textarea
+                    id="message"
+                    name="message"
+                    rows={3}
+                    defaultValue={promotionMessage ?? ""}
+                    placeholder='e.g. "🎉 Summer launch special — everything free through July!"'
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Button submit variant="primary" loading={isSubmitting}>
+                    Save message
+                  </Button>
+                  {promotionMessage && (
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      Current: &ldquo;{promotionMessage}&rdquo;
+                    </Text>
+                  )}
+                </InlineStack>
+              </BlockStack>
+            </Form>
           </BlockStack>
         </Card>
 

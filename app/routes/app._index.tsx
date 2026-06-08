@@ -185,9 +185,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const scanScope = latestCompleted
     ? getScanScopeFromSnapshot(latestCompleted.snapshot)
     : null;
-  const [promotionActive, promotionEndsAt] = await Promise.all([
+  const [promotionActive, promotionEndsAt, promotionMessage] = await Promise.all([
     isPromotionActive(),
     getSetting("promotion_ends_at"),
+    getSetting("promotion_message"),
   ]);
 
   const totalFindingCount = latestCompleted?.findings.length ?? 0;
@@ -215,6 +216,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     isAdminUser: isAdmin(session.email),
     promotionActive,
     promotionEndsAt,
+    promotionMessage,
   });
 };
 
@@ -270,6 +272,7 @@ export default function Dashboard() {
     isAdminUser,
     promotionActive,
     promotionEndsAt,
+    promotionMessage,
   } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -379,9 +382,11 @@ export default function Dashboard() {
             <div className="ld-promo-banner-text">
               <strong>Free promotion active!</strong>
               <p>
-                {promotionEndsAt
-                  ? `All features are free until ${new Date(promotionEndsAt).toLocaleDateString()}.`
-                  : "All features are currently free for everyone."}
+                {promotionMessage
+                  ? promotionMessage
+                  : promotionEndsAt
+                    ? `All features are free until ${new Date(promotionEndsAt).toLocaleDateString()}.`
+                    : "All features are currently free for everyone."}
               </p>
             </div>
           </div>

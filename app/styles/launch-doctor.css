@@ -881,6 +881,44 @@
   color: var(--ld-muted);
 }
 
+.ld-admin-textarea-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ld-admin-textarea-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ld-ink);
+}
+
+.ld-admin-textarea-field textarea {
+  max-width: 480px;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--ld-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ld-ink);
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ld-admin-textarea-field textarea:focus {
+  outline: none;
+  border-color: #2c6ecb;
+  box-shadow: 0 0 0 3px rgba(44, 110, 203, 0.12);
+}
+
+.ld-admin-textarea-field textarea:disabled {
+  background: #f4f6f8;
+  color: var(--ld-muted);
+  cursor: not-allowed;
+}
+
 /* ── Promotion banner on dashboard ── */
 
 .ld-promo-banner {
