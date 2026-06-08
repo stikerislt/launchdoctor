@@ -26,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const email = session.email;
 
-  if (!isAdmin(email)) {
+  if (!isAdmin(email, session.shop)) {
     throw new Response("Not authorized", { status: 403 });
   }
 
@@ -53,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
 
-  if (!isAdmin(session.email)) {
+  if (!isAdmin(session.email, session.shop)) {
     return json({ error: "Not authorized" }, { status: 403 });
   }
 

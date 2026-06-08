@@ -27,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     select: { id: true },
   });
 
-  const admin = isAdmin(session.email);
+  const admin = isAdmin(session.email, session.shop);
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",

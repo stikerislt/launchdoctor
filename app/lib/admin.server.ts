@@ -4,10 +4,15 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "leveris.sigitas@gmail.com,nor
   .split(",")
   .map((e) => e.trim().toLowerCase());
 
-/** Returns true if the current session email is in the admin list. */
-export function isAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return ADMIN_EMAILS.includes(email.toLowerCase());
+const ADMIN_STORES = (process.env.ADMIN_STORES || "northward-systems.myshopify.com")
+  .split(",")
+  .map((s) => s.trim().toLowerCase());
+
+/** Returns true if the user is an admin (by email) or the store is a dev/admin store. */
+export function isAdmin(email: string | null | undefined, shopDomain?: string | null): boolean {
+  if (email && ADMIN_EMAILS.includes(email.toLowerCase())) return true;
+  if (shopDomain && ADMIN_STORES.includes(shopDomain.toLowerCase())) return true;
+  return false;
 }
 
 /** Read a global app setting (key-value). Returns null if not set. */
