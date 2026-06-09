@@ -69,13 +69,9 @@ export default function App() {
           Dashboard
         </Link>
         {latestAuditId ? (
-          <Link to={`/app/audit/${latestAuditId}`}>Latest report</Link>
+          <Link to={`/app/audit/${latestAuditId}`}>Report</Link>
         ) : null}
-        {latestAuditId ? (
-          <Link to={`/app/fixes/${latestAuditId}`}>Fix Center</Link>
-        ) : null}
-        <Link to="/app/audit-plus">Audit Plus</Link>
-        <Link to="/app/monitor">Store Monitor</Link>
+        <Link to="/app/audit-plus">Tools</Link>
         <Link to="/app/history">History</Link>
         <Link to="/app/billing">Billing</Link>
         <Link to="/app/settings">Settings</Link>

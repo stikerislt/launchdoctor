@@ -48,6 +48,10 @@ import { PillarIssueSummary } from "../components/PillarIssueSummary";
 import { shopifyAppPath } from "../lib/app-routes";
 import { APP_ICON_SRC } from "../lib/assets";
 import { isAdmin, isPromotionActive, getSetting } from "../lib/admin.server";
+import {
+  checkPromotionAuditLimit,
+  PROMOTION_LIMIT_MESSAGE,
+} from "../lib/promotion-limits.server";
 
 // A RUNNING audit may legitimately take a while on large catalogs, so give it a
 // generous window. A PENDING audit means the worker never even picked the job up,
@@ -185,11 +189,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const scanScope = latestCompleted
     ? getScanScopeFromSnapshot(latestCompleted.snapshot)
     : null;
-  const [promotionActive, promotionEndsAt, promotionMessage] = await Promise.all([
-    isPromotionActive(),
-    getSetting("promotion_ends_at"),
-    getSetting("promotion_message"),
-  ]);
+  const [promotionActive, promotionEndsAt, promotionMessage, promotionAuditLimit] =
+    await Promise.all([
+      isPromotionActive(),
+      getSetting("promotion_ends_at"),
+      getSetting("promotion_message"),
+      checkPromotionAuditLimit(store.id, shopDomain, session.email),
+    ]);
+
+  const url = new URL(request.url);
+  const limitReached = url.searchParams.get("limitReached") === "1";
 
   const totalFindingCount = latestCompleted?.findings.length ?? 0;
   const activeFindingCount = activeFindings.length;
@@ -217,6 +226,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     promotionActive,
     promotionEndsAt,
     promotionMessage,
+    promotionAuditLimit,
+    limitReached,
   });
 };
 
@@ -227,6 +238,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     create: { shopDomain: session.shop },
     update: {},
   });
+
+  const limit = await checkPromotionAuditLimit(store.id, session.shop, session.email);
+  if (!limit.allowed) {
+    return redirect(shopifyAppPath("/app?limitReached=1", session.shop));
+  }
 
   const audit = await prisma.audit.create({
     data: { storeId: store.id, status: "PENDING", triggeredBy: "MANUAL" },
@@ -273,6 +289,8 @@ export default function Dashboard() {
     promotionActive,
     promotionEndsAt,
     promotionMessage,
+    promotionAuditLimit,
+    limitReached,
   } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -325,18 +343,15 @@ export default function Dashboard() {
       badge: latestAudit ? "Start here" : runningAudit ? "In progress" : undefined,
     },
     {
-      title: "Fix Center",
+      title: "Tools",
       description: auditPlusActive
         ? fixCount > 0
-          ? `${fixCount} one-click fix pack${fixCount === 1 ? "" : "s"} ready.`
-          : "SEO, catalog, images, inventory, and trust page fixes."
-        : "Audit Plus subscribers can apply SEO and catalog fixes in one click.",
-      actionLabel: auditPlusActive ? "Open Fix Center" : "Get Audit Plus",
-      onAction: () =>
-        auditPlusActive && fixesPath
-          ? navigate(fixesPath)
-          : navigate(shopifyAppPath("/app/audit-plus", shopDomain)),
-      badge: auditPlusActive ? "Subscriber" : "Fixes locked",
+          ? `Fix Center, Store Monitor, and more — ${fixCount} fix pack${fixCount === 1 ? "" : "s"} ready.`
+          : "Fix Center, Store Monitor, PageSpeed, link checker, and image optimizer."
+        : "Fix Center, monitoring, and subscriber utilities — unlock with Audit Plus.",
+      actionLabel: "Open Tools",
+      onAction: () => navigate(shopifyAppPath("/app/audit-plus", shopDomain)),
+      badge: auditPlusActive ? "Subscriber" : undefined,
     },
     {
       title: "Image Optimizer",
@@ -346,12 +361,6 @@ export default function Dashboard() {
       actionLabel: "Open Image Optimizer",
       onAction: () => navigate(shopifyAppPath("/app/image-optimizer", shopDomain)),
       badge: latestAudit ? "New" : undefined,
-    },
-    {
-      title: "Audit Plus hub",
-      description: "Monitoring, theme-change rescans, and subscription tools.",
-      actionLabel: "Open hub",
-      onAction: () => navigate(shopifyAppPath("/app/audit-plus", shopDomain)),
     },
     {
       title: "Audit history",
@@ -376,6 +385,15 @@ export default function Dashboard() {
     <Page>
       <TitleBar title="Launch Doctor" />
       <BlockStack gap="500">
+        {limitReached && (
+          <Banner tone="warning" title="Weekly audit limit reached">
+            {PROMOTION_LIMIT_MESSAGE}{" "}
+            {promotionAuditLimit.resetsAt
+              ? `Your next slot opens around ${new Date(promotionAuditLimit.resetsAt).toLocaleDateString()}.`
+              : "Try again after your oldest audit ages out of the rolling 7-day window."}
+          </Banner>
+        )}
+
         {promotionActive && (
           <div className="ld-promo-banner">
             <span className="ld-promo-banner-icon">🎉</span>
@@ -388,6 +406,7 @@ export default function Dashboard() {
                     ? `All features are free until ${new Date(promotionEndsAt).toLocaleDateString()}.`
                     : "All features are currently free for everyone."}
               </p>
+              <p className="ld-promo-banner-limit">{PROMOTION_LIMIT_MESSAGE}</p>
             </div>
           </div>
         )}
@@ -417,14 +436,23 @@ export default function Dashboard() {
                   <li>Audit Plus fixes SEO & catalog issues in one click</li>
                 </ul>
                 <div style={{ marginTop: 24 }}>
-                  <Button
-                    variant="primary"
-                    size="large"
-                    loading={isRunning}
-                    onClick={() => submit({}, { method: "post" })}
-                  >
-                    Run my first audit
-                  </Button>
+                  <BlockStack gap="200">
+                    {promotionAuditLimit.limited && !promotionAuditLimit.exempt && (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {promotionAuditLimit.used} of {promotionAuditLimit.limit} promotion
+                        audits used this week
+                      </Text>
+                    )}
+                    <Button
+                      variant="primary"
+                      size="large"
+                      loading={isRunning}
+                      disabled={promotionAuditLimit.limited && !promotionAuditLimit.allowed}
+                      onClick={() => submit({}, { method: "post" })}
+                    >
+                      Run my first audit
+                    </Button>
+                  </BlockStack>
                 </div>
               </div>
             </div>
@@ -481,10 +509,18 @@ export default function Dashboard() {
                         </p>
                       )}
 
+                      {promotionAuditLimit.limited && !promotionAuditLimit.exempt && (
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {promotionAuditLimit.used} of {promotionAuditLimit.limit} promotion
+                          audits used this week
+                        </Text>
+                      )}
+
                       <div className="ld-dashboard-actions">
                         <Button
                           variant="primary"
                           loading={isRunning}
+                          disabled={promotionAuditLimit.limited && !promotionAuditLimit.allowed}
                           onClick={() => submit({}, { method: "post" })}
                         >
                           Re-run full audit

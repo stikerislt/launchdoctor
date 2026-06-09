@@ -123,11 +123,11 @@ export default function AuditPlusHub() {
   const settingsPath = shopifyAppPath("/app/settings", shopDomain);
 
   return (
-    <AppPage title="Audit Plus" shopDomain={shopDomain}>
+    <AppPage title="Tools" shopDomain={shopDomain}>
       <BlockStack gap="500">
         <AppBrandHeader
-          title="Audit Plus"
-          subtitle="Your hub for one-click fixes, unlocked reports, and automated monitoring"
+          title="Tools"
+          subtitle="Fix Center, Store Monitor, and subscriber utilities in one place"
         />
 
         {justSubscribed && auditPlusActive && (

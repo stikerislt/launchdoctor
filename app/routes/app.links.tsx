@@ -174,7 +174,7 @@ export default function BrokenLinkFinder() {
         title="Broken Link Finder"
         shopDomain={shopDomain}
         backTo="/app/audit-plus"
-        backLabel="Audit Plus"
+        backLabel="Tools"
       >
         <BlockStack gap="500">
           <AppBrandHeader
@@ -205,7 +205,7 @@ export default function BrokenLinkFinder() {
       title="Broken Link Finder"
       shopDomain={shopDomain}
       backTo="/app/audit-plus"
-      backLabel="Audit Plus"
+      backLabel="Tools"
     >
       <BlockStack gap="500">
         <AppBrandHeader

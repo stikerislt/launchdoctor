@@ -41,6 +41,10 @@ import {
 import { resolveProductSeoUpdatesFromForm } from "../lib/fixes/product-seo.server";
 import { sessionHasScope } from "../lib/fix-access-errors.server";
 import { enqueueAudit } from "../lib/queue.server";
+import {
+  checkPromotionAuditLimit,
+  PROMOTION_LIMIT_MESSAGE,
+} from "../lib/promotion-limits.server";
 import prisma from "../db.server";
 import { AppPage } from "../components/AppPage";
 import { AppBrandHeader } from "../components/AppBrandHeader";
@@ -73,6 +77,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dismissedFixes = allFixes.filter((fix) => dismissedFixIds.has(fix.id));
 
   const hasWriteInventoryScope = sessionHasScope(session.scope, "write_inventory");
+  const limitReached = new URL(request.url).searchParams.get("limitReached") === "1";
 
   return json({
     shopDomain: session.shop,
@@ -85,6 +90,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     devBillingBypass: isDevBillingBypassEnabled(),
     rawFindingCount: audit.findings.length,
     hasWriteInventoryScope,
+    limitReached,
   });
 };
 
@@ -139,6 +145,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   // Explicit, merchant-triggered re-scan. Applying individual fixes no longer
   // enqueues an audit (see below) — the merchant batches fixes and re-scans once.
   if (intent === "rescan") {
+    const limit = await checkPromotionAuditLimit(
+      audit.storeId,
+      session.shop,
+      session.email,
+    );
+    if (!limit.allowed) {
+      return redirect(
+        shopifyAppPath(`/app/fixes/${audit.id}?limitReached=1`, session.shop),
+      );
+    }
+
     const newAudit = await prisma.audit.create({
       data: {
         storeId: audit.storeId,
@@ -204,6 +221,7 @@ export default function FixCenter() {
     devBillingBypass,
     rawFindingCount,
     hasWriteInventoryScope,
+    limitReached,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
@@ -388,9 +406,15 @@ export default function FixCenter() {
       title="Fix Center"
       shopDomain={shopDomain}
       backTo="/app/audit-plus"
-      backLabel="Audit Plus"
+      backLabel="Tools"
     >
       <BlockStack gap="500">
+        {limitReached && (
+          <Banner tone="warning" title="Weekly audit limit reached">
+            {PROMOTION_LIMIT_MESSAGE}
+          </Banner>
+        )}
+
         <AppBrandHeader
           title="Fix Center"
           subtitle={

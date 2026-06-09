@@ -952,3 +952,18 @@
   font-size: 13px;
   color: #2e7d32;
 }
+
+.ld-promo-banner-limit {
+  font-size: 12px !important;
+  opacity: 0.9;
+}
+
+.ld-admin-confirm-input {
+  max-width: 240px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--ld-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ld-ink);
+}

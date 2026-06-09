@@ -18,6 +18,8 @@ import { hasAuditPlus } from "../lib/billing.server";
 import { resolveScoresFromFindings } from "../lib/audit-access.server";
 import { getDismissedRuleCodes } from "../lib/fixes/dismissals.server";
 import { enqueueAudit } from "../lib/queue.server";
+import { checkPromotionAuditLimit } from "../lib/promotion-limits.server";
+import { shopifyAppPath } from "../lib/app-routes";
 import {
   catalogMetricRows,
   computeHealthAlerts,
@@ -28,11 +30,12 @@ import {
 import { resolveMonitorPerformance } from "../lib/monitor/performance";
 import { AppPage } from "../components/AppPage";
 import { AppBrandHeader } from "../components/AppBrandHeader";
-import { shopifyAppPath } from "../lib/app-routes";
+import { PROMOTION_LIMIT_MESSAGE } from "../lib/promotion-limits.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shopDomain = session.shop;
+  const limitReached = new URL(request.url).searchParams.get("limitReached") === "1";
   const store = await prisma.store.findUnique({ where: { shopDomain } });
 
   if (!store) {
@@ -43,6 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       linkScan: null,
       pageSpeed: null,
       running: false,
+      limitReached,
     });
   }
 
@@ -107,6 +111,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
       : null,
     running: Boolean(running),
+    limitReached,
   });
 };
 
@@ -129,6 +134,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect(shopifyAppPath(`/app/audit/${running.id}`, session.shop));
   }
 
+  const limit = await checkPromotionAuditLimit(store.id, session.shop, session.email);
+  if (!limit.allowed) {
+    return redirect(shopifyAppPath("/app/monitor?limitReached=1", session.shop));
+  }
+
   const audit = await prisma.audit.create({
     data: { storeId: store.id, status: "PENDING", triggeredBy: "MANUAL" },
   });
@@ -144,7 +154,7 @@ const ALERT_TONE_MAP: Record<AlertTone, "critical" | "warning" | "success" | "in
 };
 
 export default function StoreMonitor() {
-  const { shopDomain, auditPlusActive, snapshots, linkScan, pageSpeed, running } =
+  const { shopDomain, auditPlusActive, snapshots, linkScan, pageSpeed, running, limitReached } =
     useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -157,7 +167,7 @@ export default function StoreMonitor() {
         title="Store Monitor"
         shopDomain={shopDomain}
         backTo="/app/audit-plus"
-        backLabel="Audit Plus"
+        backLabel="Tools"
       >
         <BlockStack gap="500">
           <AppBrandHeader
@@ -209,13 +219,19 @@ export default function StoreMonitor() {
       title="Store Monitor"
       shopDomain={shopDomain}
       backTo="/app/audit-plus"
-      backLabel="Audit Plus"
+      backLabel="Tools"
     >
       <BlockStack gap="500">
         <AppBrandHeader
           title="Store Monitor"
           subtitle="Ongoing health tracking, trends, and change alerts"
         />
+
+        {limitReached && (
+          <Banner tone="warning" title="Weekly audit limit reached">
+            {PROMOTION_LIMIT_MESSAGE}
+          </Banner>
+        )}
 
         <Card>
           <BlockStack gap="300">

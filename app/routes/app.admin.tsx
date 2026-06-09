@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Banner,
@@ -21,6 +21,11 @@ import {
   setSetting,
 } from "../lib/admin.server";
 import { AppPage } from "../components/AppPage";
+import { AdminDatePicker } from "../components/AdminDatePicker";
+import {
+  PROMOTION_LIMIT_MESSAGE,
+  PROMOTION_WEEKLY_MANUAL_AUDIT_LIMIT,
+} from "../lib/promotion-limits.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -91,6 +96,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ success: true, message: "Banner message saved." });
   }
 
+  if (intent === "reset-audits") {
+    const confirm = String(formData.get("confirm") ?? "").trim();
+    if (confirm !== "RESET") {
+      return json({ error: 'Type RESET in the confirmation field to delete all audits.' });
+    }
+    const { count } = await prisma.audit.deleteMany({});
+    return json({
+      success: true,
+      message: `Deleted ${count.toLocaleString()} audit record${count === 1 ? "" : "s"}.`,
+    });
+  }
+
   return json({ error: "Unknown action." });
 };
 
@@ -155,7 +172,8 @@ export default function AdminPanel() {
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
                   When active, all stores get free access — Audit Plus features,
-                  full report unlocks, and PDFs are free for everyone.
+                  full report unlocks, and PDFs are free for everyone.{" "}
+                  {PROMOTION_LIMIT_MESSAGE}
                 </Text>
               </BlockStack>
               <Badge tone={promotionActive ? "success" : undefined}>
@@ -175,19 +193,15 @@ export default function AdminPanel() {
               <Form method="post">
                 <input type="hidden" name="intent" value="enable-promotion" />
                 <BlockStack gap="300">
-                  <div className="ld-admin-date-field">
-                    <label htmlFor="endsAt">End date (optional)</label>
-                    <input
-                      id="endsAt"
-                      type="date"
-                      name="endsAt"
-                      disabled={isSubmitting}
-                    />
-                    <p className="ld-admin-date-help">
-                      Leave blank for indefinite promotion. Set a date to
-                      auto-remind yourself to turn it off.
-                    </p>
-                  </div>
+                  <AdminDatePicker
+                    name="endsAt"
+                    disabled={isSubmitting}
+                    helpText="Leave blank for indefinite promotion. Set a date to auto-remind yourself to turn it off."
+                  />
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Each store is capped at {PROMOTION_WEEKLY_MANUAL_AUDIT_LIMIT} manual
+                    full audits per rolling week (admin stores are exempt).
+                  </Text>
                   <InlineStack gap="200" blockAlign="center" wrap>
                     <Button submit variant="primary" loading={isSubmitting}>
                       Enable free promotion
@@ -287,6 +301,37 @@ export default function AdminPanel() {
                 <div className="ld-severity-stat-label">Active Plus</div>
               </div>
             </div>
+            <Form method="post">
+              <input type="hidden" name="intent" value="reset-audits" />
+              <BlockStack gap="300">
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Deletes all audit records globally — for dev cleanup only. Findings
+                  are removed with their audits.
+                </Text>
+                <div className="ld-admin-textarea-field">
+                  <label htmlFor="confirm">Type RESET to confirm</label>
+                  <input
+                    id="confirm"
+                    name="confirm"
+                    type="text"
+                    autoComplete="off"
+                    placeholder="RESET"
+                    disabled={isSubmitting}
+                    className="ld-admin-confirm-input"
+                  />
+                </div>
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Button
+                    submit
+                    tone="critical"
+                    loading={isSubmitting}
+                    disabled={auditCount === 0}
+                  >
+                    Reset audit count
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Form>
           </BlockStack>
         </Card>
       </BlockStack>
