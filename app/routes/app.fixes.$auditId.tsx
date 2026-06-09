@@ -41,10 +41,8 @@ import {
 import { resolveProductSeoUpdatesFromForm } from "../lib/fixes/product-seo.server";
 import { sessionHasScope } from "../lib/fix-access-errors.server";
 import { enqueueAudit } from "../lib/queue.server";
-import {
-  checkPromotionAuditLimit,
-  PROMOTION_LIMIT_MESSAGE,
-} from "../lib/promotion-limits.server";
+import { PROMOTION_LIMIT_MESSAGE } from "../lib/promotion-limits";
+import { checkPromotionAuditLimit } from "../lib/promotion-limits.server";
 import prisma from "../db.server";
 import { AppPage } from "../components/AppPage";
 import { AppBrandHeader } from "../components/AppBrandHeader";

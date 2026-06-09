@@ -1,23 +1,14 @@
 import prisma from "./prisma.server";
 import { isPromotionActive, isAdmin } from "./admin.server";
+import {
+  PROMOTION_WEEKLY_MANUAL_AUDIT_LIMIT,
+  type PromotionAuditLimit,
+} from "./promotion-limits";
 
-/** Max manual full-store audits per store per rolling 7 days while promotion is active. */
-export const PROMOTION_WEEKLY_MANUAL_AUDIT_LIMIT = 3;
-
-export const PROMOTION_LIMIT_MESSAGE =
-  "During the free promotion, each store is limited to 3 full audits per week.";
+export { PROMOTION_WEEKLY_MANUAL_AUDIT_LIMIT, PROMOTION_LIMIT_MESSAGE } from "./promotion-limits";
+export type { PromotionAuditLimit } from "./promotion-limits";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-export type PromotionAuditLimit = {
-  limited: boolean;
-  allowed: boolean;
-  used: number;
-  limit: number;
-  remaining: number;
-  exempt?: boolean;
-  resetsAt: string | null;
-};
 
 function weekAgo(): Date {
   return new Date(Date.now() - WEEK_MS);

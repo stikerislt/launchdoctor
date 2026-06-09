@@ -48,10 +48,8 @@ import { PillarIssueSummary } from "../components/PillarIssueSummary";
 import { shopifyAppPath } from "../lib/app-routes";
 import { APP_ICON_SRC } from "../lib/assets";
 import { isAdmin, isPromotionActive, getSetting } from "../lib/admin.server";
-import {
-  checkPromotionAuditLimit,
-  PROMOTION_LIMIT_MESSAGE,
-} from "../lib/promotion-limits.server";
+import { PROMOTION_LIMIT_MESSAGE } from "../lib/promotion-limits";
+import { checkPromotionAuditLimit } from "../lib/promotion-limits.server";
 
 // A RUNNING audit may legitimately take a while on large catalogs, so give it a
 // generous window. A PENDING audit means the worker never even picked the job up,

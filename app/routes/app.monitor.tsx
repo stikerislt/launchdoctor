@@ -30,7 +30,7 @@ import {
 import { resolveMonitorPerformance } from "../lib/monitor/performance";
 import { AppPage } from "../components/AppPage";
 import { AppBrandHeader } from "../components/AppBrandHeader";
-import { PROMOTION_LIMIT_MESSAGE } from "../lib/promotion-limits.server";
+import { PROMOTION_LIMIT_MESSAGE } from "../lib/promotion-limits";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);

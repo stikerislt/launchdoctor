@@ -25,7 +25,7 @@ import { AdminDatePicker } from "../components/AdminDatePicker";
 import {
   PROMOTION_LIMIT_MESSAGE,
   PROMOTION_WEEKLY_MANUAL_AUDIT_LIMIT,
-} from "../lib/promotion-limits.server";
+} from "../lib/promotion-limits";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
