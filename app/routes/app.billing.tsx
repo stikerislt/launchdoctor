@@ -219,7 +219,7 @@ export default function Billing() {
 
         {auditPlusActive && !justCancelled && (
           <Banner tone="success">
-            Audit Plus is active. Open the Audit Plus hub for Fix Center and monitoring.
+            Audit Plus is active. Open Tools for Fix Center and monitoring.
           </Banner>
         )}
 
@@ -305,8 +305,8 @@ export default function Billing() {
                 $9/month — Audit Plus
               </Text>
               <Text as="p" variant="bodyMd" tone="subdued">
-                Ongoing monitoring and Fix Center. After subscribing, use the Audit Plus
-                hub to apply fixes.
+                Ongoing monitoring and Fix Center. After subscribing, open Tools to
+                apply fixes.
               </Text>
               <List type="bullet">
                 <List.Item>Fix Center — alt text, images, SEO, descriptions, SKUs, inventory, trust pages</List.Item>
@@ -330,7 +330,7 @@ export default function Billing() {
                   variant="plain"
                   onClick={() => navigate(shopifyAppPath("/app/audit-plus", shopDomain))}
                 >
-                  Open Audit Plus hub
+                  Open Tools
                 </Button>
               )}
             </BlockStack>

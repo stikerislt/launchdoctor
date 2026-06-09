@@ -66,8 +66,8 @@ export default function Settings() {
             title="Audit Plus is now active"
             onDismiss={() => navigate(shopifyAppPath("/app/settings", shopDomain))}
           >
-            Open the Audit Plus hub to use Fix Center and see everything included in
-            your subscription.
+            Open Tools to use Fix Center and see everything included in your
+            subscription.
           </Banner>
         )}
 
@@ -75,13 +75,13 @@ export default function Settings() {
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center" wrap>
               <Text as="p" variant="bodyMd">
-                Fix Center, monitoring, and subscription status live in the Audit Plus hub.
+                Fix Center, monitoring, and subscription status live in Tools.
               </Text>
               <Button
                 variant="primary"
                 onClick={() => navigate(shopifyAppPath("/app/audit-plus", shopDomain))}
               >
-                Open Audit Plus
+                Open Tools
               </Button>
             </InlineStack>
           </BlockStack>
@@ -101,8 +101,8 @@ export default function Settings() {
             {auditPlusActive ? (
               <>
                 <Text as="p" variant="bodyMd">
-                  Your subscription includes the tools below. Use the Audit Plus hub to
-                  open Fix Center and track monitoring.
+                  Your Audit Plus subscription includes the items below. Open Tools
+                  for Fix Center and monitoring.
                 </Text>
                 <List type="bullet">
                   <List.Item>
@@ -131,7 +131,7 @@ export default function Settings() {
                   </List.Item>
                 </List>
                 <Button onClick={() => navigate(shopifyAppPath("/app/audit-plus", shopDomain))}>
-                  Go to Audit Plus hub
+                  Open Tools
                 </Button>
               </>
             ) : (

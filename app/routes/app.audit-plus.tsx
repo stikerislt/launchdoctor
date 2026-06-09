@@ -165,12 +165,12 @@ export default function AuditPlusHub() {
 
         <BlockStack gap="300">
           <Text as="h2" variant="headingMd">
-            Tools
+            Available tools
           </Text>
           <Text as="p" variant="bodyMd" tone="subdued">
             {auditPlusActive
-              ? "Use these tools after each audit to improve your store faster."
-              : "Subscribe to unlock Fix Center and automatic report access."}
+              ? "Use these after each audit to improve your store faster."
+              : "Subscribe to Audit Plus to unlock Fix Center and automatic report access."}
           </Text>
 
           <div className="ld-tool-grid">

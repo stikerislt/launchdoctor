@@ -318,9 +318,6 @@ export default function Dashboard() {
     : runningAudit
       ? shopifyAppPath(`/app/audit/${runningAudit.id}`, shopDomain)
       : null;
-  const fixesPath = latestAudit
-    ? shopifyAppPath(`/app/fixes/${latestAudit.id}`, shopDomain)
-    : null;
   const billingPath = latestAudit
     ? shopifyAppPath(`/app/billing?auditId=${latestAudit.id}`, shopDomain)
     : shopifyAppPath("/app/billing", shopDomain);
@@ -344,9 +341,9 @@ export default function Dashboard() {
       title: "Tools",
       description: auditPlusActive
         ? fixCount > 0
-          ? `Fix Center, Store Monitor, and more — ${fixCount} fix pack${fixCount === 1 ? "" : "s"} ready.`
-          : "Fix Center, Store Monitor, PageSpeed, link checker, and image optimizer."
-        : "Fix Center, monitoring, and subscriber utilities — unlock with Audit Plus.",
+          ? `One-click fixes, Store Monitor, PageSpeed, and more — ${fixCount} fix pack${fixCount === 1 ? "" : "s"} ready.`
+          : "One-click fixes, Store Monitor, PageSpeed, link checker, and image optimizer."
+        : "Subscriber tools for fixes, monitoring, and utilities — unlock with Audit Plus.",
       actionLabel: "Open Tools",
       onAction: () => navigate(shopifyAppPath("/app/audit-plus", shopDomain)),
       badge: auditPlusActive ? "Subscriber" : undefined,
@@ -431,7 +428,7 @@ export default function Dashboard() {
                   <li>Scans all active products (up to 10,000) and your sitemap</li>
                   <li>Free dashboard shows every issue count by severity</li>
                   <li>{previewFindingCount} detailed findings unlocked free</li>
-                  <li>Audit Plus fixes SEO & catalog issues in one click</li>
+                  <li>Audit Plus unlocks one-click fixes for SEO & catalog issues</li>
                 </ul>
                 <div style={{ marginTop: 24 }}>
                   <BlockStack gap="200">
@@ -526,8 +523,14 @@ export default function Dashboard() {
                         {reportPath && (
                           <Button onClick={() => navigate(reportPath)}>Open full report</Button>
                         )}
-                        {fixesPath && auditPlusActive && (
-                          <Button onClick={() => navigate(fixesPath)}>Fix Center</Button>
+                        {auditPlusActive && (
+                          <Button
+                            onClick={() =>
+                              navigate(shopifyAppPath("/app/audit-plus", shopDomain))
+                            }
+                          >
+                            Open Tools
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -644,25 +647,25 @@ export default function Dashboard() {
                     <BlockStack gap="100">
                       <InlineStack gap="200" blockAlign="center">
                         <Text as="h2" variant="headingMd">
-                          Audit Plus
+                          Tools
                         </Text>
                         <Badge tone={auditPlusActive ? "success" : undefined}>
-                          {auditPlusActive ? "Active" : "Subscriber tools"}
+                          {auditPlusActive ? "Audit Plus active" : "Subscriber tools"}
                         </Badge>
                       </InlineStack>
                       <Text as="p" variant="bodyMd" tone="subdued">
                         {auditPlusActive
                           ? fixCount > 0
-                            ? `${fixCount} fix pack${fixCount === 1 ? "" : "s"} ready — apply SEO and catalog fixes without leaving Launch Doctor.`
-                            : "Fix Center, unlimited report unlocks, and automatic theme-change rescans."
-                          : "Unlock one-click fixes for SEO, images, SKUs, inventory, and trust pages — $9/month."}
+                            ? `${fixCount} fix pack${fixCount === 1 ? "" : "s"} ready — apply fixes, monitor your store, and more.`
+                            : "One-click fixes, Store Monitor, unlimited report unlocks, and theme-change rescans."
+                          : "Subscribe to Audit Plus ($9/month) for Tools — fixes, monitoring, and subscriber utilities."}
                       </Text>
                     </BlockStack>
                     <Button
                       variant={auditPlusActive && fixCount > 0 ? "primary" : undefined}
                       onClick={() => navigate(shopifyAppPath("/app/audit-plus", shopDomain))}
                     >
-                      {auditPlusActive ? "Open Audit Plus" : "Explore Audit Plus"}
+                      {auditPlusActive ? "Open Tools" : "View Tools"}
                     </Button>
                   </InlineStack>
                 </BlockStack>

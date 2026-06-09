@@ -295,7 +295,7 @@ export default function StoreMonitor() {
                         ? perf.measuredAt
                           ? `PageSpeed (mobile) · ${new Date(perf.measuredAt).toLocaleDateString()}`
                           : "Google PageSpeed Insights (mobile)"
-                        : "Run a PageSpeed scan in Audit Plus Tools"
+                        : "Run a PageSpeed scan in Tools"
                     }
                     attention={perf.score != null && perf.score < 50}
                   />

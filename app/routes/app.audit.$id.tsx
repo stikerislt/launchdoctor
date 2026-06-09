@@ -538,15 +538,17 @@ export default function AuditReport() {
                 SEO, catalog, images, inventory, and trust pages.
               </Text>
               <InlineStack gap="200">
-                <Button onClick={() => navigate(fixesPath)} variant="primary">
-                  Open Fix Center
-                </Button>
                 <Button
-                  variant="plain"
                   onClick={() => navigate(shopifyAppPath("/app/audit-plus", shop))}
+                  variant="primary"
                 >
-                  Audit Plus hub
+                  Open Tools
                 </Button>
+                {fixCount > 0 && (
+                  <Button variant="plain" onClick={() => navigate(fixesPath)}>
+                    Apply fixes now
+                  </Button>
+                )}
               </InlineStack>
             </BlockStack>
           </Banner>
@@ -561,12 +563,17 @@ export default function AuditReport() {
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd">
                   This report is from an earlier run. Your latest completed audit has{" "}
-                  {latestFixCount} auto-fix pack{latestFixCount === 1 ? "" : "s"} ready in Fix
-                  Center.
+                  {latestFixCount} auto-fix pack{latestFixCount === 1 ? "" : "s"} ready in Tools.
                 </Text>
                 <InlineStack gap="200">
-                  <Button onClick={() => navigate(latestFixesPath)} variant="primary">
-                    Open Fix Center
+                  <Button
+                    onClick={() => navigate(shopifyAppPath("/app/audit-plus", shop))}
+                    variant="primary"
+                  >
+                    Open Tools
+                  </Button>
+                  <Button variant="plain" onClick={() => navigate(latestFixesPath!)}>
+                    Apply fixes now
                   </Button>
                   <Button
                     variant="plain"
@@ -588,11 +595,11 @@ export default function AuditReport() {
             <Banner tone="info">
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd">
-                  No one-click fixes were detected for this audit. Open Audit Plus for tools
-                  and monitoring.
+                  No one-click fixes were detected for this audit. Open Tools for
+                  monitoring and other subscriber utilities.
                 </Text>
                 <Button onClick={() => navigate(shopifyAppPath("/app/audit-plus", shop))}>
-                  Open Audit Plus
+                  Open Tools
                 </Button>
               </BlockStack>
             </Banner>
