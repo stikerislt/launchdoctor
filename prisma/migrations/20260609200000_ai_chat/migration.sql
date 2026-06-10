@@ -1,6 +1,6 @@
 -- AI Chat: per-store per-audit conversation history and daily usage tracking.
 
-CREATE TABLE "AIChatMessage" (
+CREATE TABLE IF NOT EXISTS "AIChatMessage" (
     "id"        TEXT NOT NULL,
     "storeId"   TEXT NOT NULL,
     "auditId"   TEXT NOT NULL,
@@ -11,10 +11,10 @@ CREATE TABLE "AIChatMessage" (
     CONSTRAINT "AIChatMessage_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "AIChatMessage_storeId_auditId_createdAt_idx" ON "AIChatMessage"("storeId", "auditId", "createdAt");
-CREATE INDEX "AIChatMessage_storeId_createdAt_idx" ON "AIChatMessage"("storeId", "createdAt");
+CREATE INDEX IF NOT EXISTS "AIChatMessage_storeId_auditId_createdAt_idx" ON "AIChatMessage"("storeId", "auditId", "createdAt");
+CREATE INDEX IF NOT EXISTS "AIChatMessage_storeId_createdAt_idx" ON "AIChatMessage"("storeId", "createdAt");
 
-CREATE TABLE "AIChatUsage" (
+CREATE TABLE IF NOT EXISTS "AIChatUsage" (
     "id"      TEXT NOT NULL,
     "storeId" TEXT NOT NULL,
     "date"    TIMESTAMP(3) NOT NULL,
@@ -23,10 +23,14 @@ CREATE TABLE "AIChatUsage" (
     CONSTRAINT "AIChatUsage_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "AIChatUsage_storeId_date_key" ON "AIChatUsage"("storeId", "date");
-CREATE INDEX "AIChatUsage_storeId_idx" ON "AIChatUsage"("storeId");
+CREATE UNIQUE INDEX IF NOT EXISTS "AIChatUsage_storeId_date_key" ON "AIChatUsage"("storeId", "date");
+CREATE INDEX IF NOT EXISTS "AIChatUsage_storeId_idx" ON "AIChatUsage"("storeId");
 
+ALTER TABLE "AIChatMessage" DROP CONSTRAINT IF EXISTS "AIChatMessage_storeId_fkey";
 ALTER TABLE "AIChatMessage" ADD CONSTRAINT "AIChatMessage_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "AIChatMessage" DROP CONSTRAINT IF EXISTS "AIChatMessage_auditId_fkey";
 ALTER TABLE "AIChatMessage" ADD CONSTRAINT "AIChatMessage_auditId_fkey" FOREIGN KEY ("auditId") REFERENCES "Audit"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+ALTER TABLE "AIChatUsage" DROP CONSTRAINT IF EXISTS "AIChatUsage_storeId_fkey";
 ALTER TABLE "AIChatUsage" ADD CONSTRAINT "AIChatUsage_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
