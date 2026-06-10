@@ -396,7 +396,7 @@ export default function AuditReport() {
 
 
   return (
-
+    <>
     <AppPage
       title="Audit Report"
       shopDomain={shop}
@@ -757,6 +757,7 @@ export default function AuditReport() {
         auditPlusActive={auditPlusActive}
       />
     )}
+    </>
 
   );
 
