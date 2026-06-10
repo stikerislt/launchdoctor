@@ -967,3 +967,115 @@
   background: #fff;
   color: var(--ld-ink);
 }
+
+/* ── AI Chat ── */
+
+.ld-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 8px 0;
+  scroll-behavior: smooth;
+}
+
+.ld-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ld-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ld-chat-messages::-webkit-scrollbar-thumb {
+  background: var(--ld-border);
+  border-radius: 3px;
+}
+
+.ld-chat-loading,
+.ld-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.ld-chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.ld-chat-suggestion-chip {
+  display: inline-block;
+  padding: 6px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ld-accent-dark);
+  background: rgba(139, 195, 74, 0.08);
+  border: 1px solid rgba(139, 195, 74, 0.25);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.ld-chat-suggestion-chip:hover {
+  background: rgba(139, 195, 74, 0.16);
+  border-color: var(--ld-accent);
+}
+
+.ld-chat-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 85%;
+}
+
+.ld-chat-bubble--user {
+  align-self: flex-end;
+}
+
+.ld-chat-bubble--assistant {
+  align-self: flex-start;
+}
+
+.ld-chat-bubble-content {
+  padding: 12px 16px;
+  border-radius: 14px;
+  line-height: 1.55;
+}
+
+.ld-chat-bubble--user .ld-chat-bubble-content {
+  background: linear-gradient(135deg, var(--ld-accent) 0%, var(--ld-accent-dark) 100%);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.ld-chat-bubble--user .ld-chat-bubble-content p {
+  color: inherit;
+}
+
+.ld-chat-bubble--assistant .ld-chat-bubble-content {
+  background: var(--ld-surface);
+  color: var(--ld-ink);
+  border: 1px solid var(--ld-border);
+  border-bottom-left-radius: 4px;
+}
+
+.ld-chat-bubble--assistant .ld-chat-bubble-content strong {
+  color: var(--ld-ink);
+}
+
+.ld-chat-typing {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+

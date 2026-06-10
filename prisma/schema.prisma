@@ -41,6 +41,8 @@ model Store {
   linkScans      LinkScan[]
   pageSpeedScans PageSpeedScan[]
   backgroundJobs BackgroundJob[]
+  chatMessages   AIChatMessage[]
+  chatUsages     AIChatUsage[]
 
   @@index([shopDomain])
 }
@@ -63,6 +65,7 @@ model Audit {
   oneTimeChargeId String?
   pdfUrl          String?
   errorMessage    String?
+  chatMessages    AIChatMessage[]
 
   @@index([storeId, completedAt])
   @@index([storeId, status])
@@ -276,4 +279,31 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// AI Chat — per-store per-audit conversation history.
+model AIChatMessage {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  auditId   String
+  audit     Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([storeId, auditId, createdAt])
+  @@index([storeId, createdAt])
+}
+
+// Daily AI chat usage counter (UTC calendar day).
+model AIChatUsage {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date      DateTime // UTC start of day
+  count     Int      @default(0)
+
+  @@unique([storeId, date])
+  @@index([storeId])
 }

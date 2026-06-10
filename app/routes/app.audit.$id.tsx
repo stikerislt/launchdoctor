@@ -57,6 +57,8 @@ import { APP_ICON_SRC } from "../lib/assets";
 
 import { useEmbeddedDownload } from "../hooks/useEmbeddedDownload";
 
+import { AIChat } from "../components/AIChat";
+
 
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -743,6 +745,14 @@ export default function AuditReport() {
           ))}
 
         </BlockStack>
+
+        {audit.status === "COMPLETED" && (
+          <AIChat
+            auditId={audit.id}
+            shopDomain={shop}
+            auditPlusActive={auditPlusActive}
+          />
+        )}
 
       </BlockStack>
 
