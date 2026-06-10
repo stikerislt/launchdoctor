@@ -746,17 +746,17 @@ export default function AuditReport() {
 
         </BlockStack>
 
-        {audit.status === "COMPLETED" && (
-          <AIChat
-            auditId={audit.id}
-            shopDomain={shop}
-            auditPlusActive={auditPlusActive}
-          />
-        )}
-
       </BlockStack>
 
     </AppPage>
+
+    {audit.status === "COMPLETED" && (
+      <AIChat
+        auditId={audit.id}
+        shopDomain={shop}
+        auditPlusActive={auditPlusActive}
+      />
+    )}
 
   );
 

@@ -4,13 +4,11 @@ import {
   Banner,
   BlockStack,
   Button,
-  Card,
   InlineStack,
   Spinner,
   Text,
   TextField,
   Badge,
-  Divider,
 } from "@shopify/polaris";
 
 type ChatMessage = {
@@ -45,18 +43,20 @@ export function AIChat({
   shopDomain: string;
   auditPlusActive: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const chatPath = `/app/chat/${auditId}?shop=${encodeURIComponent(shopDomain)}`;
   const loaderFetcher = useFetcher<ChatLoaderData>();
   const actionFetcher = useFetcher<ChatActionData>();
   const [inputValue, setInputValue] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Load messages on mount
+  // Load messages when panel opens
   useEffect(() => {
-    loaderFetcher.load(chatPath);
-  }, [chatPath]);
+    if (open) {
+      loaderFetcher.load(chatPath);
+    }
+  }, [open, chatPath]);
 
-  // Merge loader data and optimistic action data
   const loaderData = loaderFetcher.data;
   const actionData = actionFetcher.data;
   const isSending = actionFetcher.state === "submitting";
@@ -71,15 +71,14 @@ export function AIChat({
   const dailyLimit = actionData?.dailyLimit ?? loaderData?.dailyLimit ?? 5;
   const remaining = Math.max(0, dailyLimit - todayUsage);
   const isAtLimit = remaining === 0 && !auditPlusActive;
+  const isLoading = loaderFetcher.state === "loading" && messages.length === 0;
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
   const handleSend = () => {
     if (!inputValue.trim() || isSending) return;
-
     const formData = new FormData();
     formData.set("message", inputValue.trim());
     actionFetcher.submit(formData, { method: "post", action: chatPath });
@@ -93,141 +92,168 @@ export function AIChat({
     }
   };
 
-  const isLoading = loaderFetcher.state === "loading" && messages.length === 0;
-
   return (
-    <Card>
-      <BlockStack gap="400">
-        {/* Header */}
-        <InlineStack align="space-between" blockAlign="center" wrap>
-          <BlockStack gap="050">
-            <Text as="h2" variant="headingMd">
-              AI Report Assistant
-            </Text>
-            <Text as="p" variant="bodyMd" tone="subdued">
-              Ask questions about your audit results — impact, priorities, and how to improve
-            </Text>
-          </BlockStack>
-          <Badge tone={auditPlusActive ? "success" : undefined}>
-            {`${String(remaining)} / ${String(dailyLimit)} today`}
-          </Badge>
-        </InlineStack>
+    <>
+      {/* Floating bubble button */}
+      <button
+        type="button"
+        className={`ld-chat-bubble-btn ${open ? "ld-chat-bubble-btn--hidden" : ""}`}
+        onClick={() => setOpen(true)}
+        aria-label="Open AI chat"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        <span>Ask AI</span>
+      </button>
 
-        <Divider />
+      {/* Slide-in panel */}
+      {open && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="ld-chat-backdrop"
+            onClick={() => setOpen(false)}
+          />
 
-        {/* Error banner */}
-        {actionData?.error && (
-          <Banner tone="critical">
-            <Text as="p" variant="bodyMd">
-              {actionData.error}
-            </Text>
-          </Banner>
-        )}
-
-        {/* Messages area */}
-        <div className="ld-chat-messages">
-          {isLoading && (
-            <div className="ld-chat-loading">
-              <Spinner accessibilityLabel="Loading chat" size="small" />
-              <Text as="span" variant="bodyMd" tone="subdued">
-                Loading conversation…
-              </Text>
+          {/* Panel */}
+          <div className="ld-chat-panel">
+            {/* Header */}
+            <div className="ld-chat-panel-header">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="050">
+                  <Text as="h2" variant="headingMd">
+                    AI Report Assistant
+                  </Text>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Ask about your audit findings
+                  </Text>
+                </BlockStack>
+                <InlineStack gap="200" blockAlign="center">
+                  <Badge tone={auditPlusActive ? "success" : undefined}>
+                    {`${String(remaining)}/${String(dailyLimit)}`}
+                  </Badge>
+                  <button
+                    type="button"
+                    className="ld-chat-close-btn"
+                    onClick={() => setOpen(false)}
+                    aria-label="Close chat"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </InlineStack>
+              </InlineStack>
             </div>
-          )}
 
-          {!isLoading && messages.length === 0 && (
-            <div className="ld-chat-empty">
-              <Text as="p" variant="bodyMd" tone="subdued">
-                No questions yet. Try asking:
-              </Text>
-              <div className="ld-chat-suggestions">
-                <SuggestionChip
-                  label="What has the most impact on my SEO?"
-                  onClick={() => setInputValue("What has the most impact on my SEO?")}
-                />
-                <SuggestionChip
-                  label="Which issues should I fix first?"
-                  onClick={() => setInputValue("Which issues should I fix first?")}
-                />
-                <SuggestionChip
-                  label="How do trust signals affect sales?"
-                  onClick={() => setInputValue("How do trust signals affect sales?")}
-                />
-                <SuggestionChip
-                  label="Are my images hurting performance?"
-                  onClick={() => setInputValue("Are my images hurting performance?")}
-                />
-              </div>
+            {/* Messages */}
+            <div className="ld-chat-messages">
+              {isLoading && (
+                <div className="ld-chat-loading">
+                  <Spinner accessibilityLabel="Loading chat" size="small" />
+                  <Text as="span" variant="bodyMd" tone="subdued">
+                    Loading conversation…
+                  </Text>
+                </div>
+              )}
+
+              {!isLoading && messages.length === 0 && (
+                <div className="ld-chat-empty">
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Ask me about your audit — impact, priorities, SEO, or anything else.
+                  </Text>
+                  <div className="ld-chat-suggestions">
+                    <SuggestionChip
+                      label="What impacts my SEO most?"
+                      onClick={() => setInputValue("What impacts my SEO most?")}
+                    />
+                    <SuggestionChip
+                      label="Which issues to fix first?"
+                      onClick={() => setInputValue("Which issues should I fix first?")}
+                    />
+                    <SuggestionChip
+                      label="Do trust signals matter?"
+                      onClick={() => setInputValue("How do trust signals affect sales?")}
+                    />
+                    <SuggestionChip
+                      label="Are my images too heavy?"
+                      onClick={() => setInputValue("Are my images hurting performance?")}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {messages.map((msg) => (
+                <ChatBubble key={msg.id} message={msg} />
+              ))}
+
+              {isSending && actionData?.userMessage && !actionData?.assistantMessage && (
+                <div className="ld-chat-bubble ld-chat-bubble--assistant ld-chat-typing">
+                  <Spinner accessibilityLabel="AI is thinking" size="small" />
+                  <Text as="span" variant="bodyMd" tone="subdued">
+                    Analyzing your report…
+                  </Text>
+                </div>
+              )}
+
+              {actionData?.error && (
+                <Banner tone="critical">
+                  <Text as="p" variant="bodyMd">
+                    {actionData.error}
+                  </Text>
+                </Banner>
+              )}
+
+              <div ref={chatEndRef} />
             </div>
-          )}
 
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} />
-          ))}
+            {/* Input */}
+            <div className="ld-chat-panel-footer">
+              {isAtLimit && (
+                <Banner tone="warning" title="Daily limit reached">
+                  <Text as="p" variant="bodyMd">
+                    {dailyLimit} messages/day used. Upgrade to Audit Plus for 50/day.
+                  </Text>
+                </Banner>
+              )}
 
-          {isSending && actionData?.userMessage && !actionData?.assistantMessage && (
-            <div className="ld-chat-bubble ld-chat-bubble--assistant ld-chat-typing">
-              <Spinner accessibilityLabel="AI is thinking" size="small" />
-              <Text as="span" variant="bodyMd" tone="subdued">
-                Analyzing your report…
-              </Text>
+              {!isAtLimit && (
+                <InlineStack gap="200" blockAlign="end">
+                  <div style={{ flex: 1 }} onKeyDown={handleKeyDown}>
+                    <TextField
+                      label="Ask about your audit"
+                      labelHidden
+                      value={inputValue}
+                      onChange={setInputValue}
+                      placeholder="Ask about your audit…"
+                      autoComplete="off"
+                      disabled={isSending}
+                      maxLength={4000}
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={handleSend}
+                    loading={isSending}
+                    disabled={!inputValue.trim() || isSending}
+                  >
+                    Send
+                  </Button>
+                </InlineStack>
+              )}
+
+              {!auditPlusActive && !isAtLimit && (
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Free: {dailyLimit}/day · Audit Plus: 50/day
+                </Text>
+              )}
             </div>
-          )}
-
-          <div ref={chatEndRef} />
-        </div>
-
-        <Divider />
-
-        {/* Input area */}
-        <BlockStack gap="300">
-          {isAtLimit && (
-            <Banner tone="warning" title="Daily limit reached">
-              <Text as="p" variant="bodyMd">
-                You&apos;ve used all {dailyLimit} free messages for today. Upgrade to
-                Audit Plus for 50 messages/day and full report access.
-              </Text>
-            </Banner>
-          )}
-
-          {!isAtLimit && (
-            <InlineStack gap="200" blockAlign="end">
-              <div style={{ flex: 1 }} onKeyDown={handleKeyDown}>
-                <TextField
-                  label="Ask about your audit"
-                  labelHidden
-                  value={inputValue}
-                  onChange={setInputValue}
-                  placeholder={
-                    auditPlusActive
-                      ? "e.g. What should I fix first for better SEO?"
-                      : "e.g. Which issues have the most impact?"
-                  }
-                  multiline={2}
-                  autoComplete="off"
-                  disabled={isSending}
-                  maxLength={4000}
-                />
-              </div>
-              <Button
-                variant="primary"
-                onClick={handleSend}
-                loading={isSending}
-                disabled={!inputValue.trim() || isSending}
-              >
-                Send
-              </Button>
-            </InlineStack>
-          )}
-        </BlockStack>
-
-        {!auditPlusActive && !isAtLimit && (
-          <Text as="p" variant="bodySm" tone="subdued">
-            Free plan: {dailyLimit} messages/day. Audit Plus subscribers get 50 messages/day.
-          </Text>
-        )}
-      </BlockStack>
-    </Card>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -246,25 +272,15 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         </Text>
       </div>
       <Text as="span" variant="bodySm" tone="subdued">
-        {isUser ? "You" : "AI Assistant"} · {time}
+        {isUser ? "You" : "AI"} · {time}
       </Text>
     </div>
   );
 }
 
-function SuggestionChip({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
+function SuggestionChip({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className="ld-chat-suggestion-chip"
-      onClick={onClick}
-    >
+    <button type="button" className="ld-chat-suggestion-chip" onClick={onClick}>
       {label}
     </button>
   );
